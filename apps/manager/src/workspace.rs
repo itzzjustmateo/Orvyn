@@ -1,12 +1,9 @@
 use crate::core::{self, err, Result};
 use serde_json::{json, Value};
-use std::{fs, path::Path, process::Stdio};
-#[cfg(windows)]
-use std::io::Write;
+use std::{fs, io::Write, path::Path, process::Stdio};
 use base64::Engine;
 use sha2::{Digest,Sha256};
 
-#[cfg(windows)]
 fn powershell(script: &str, input: &Value) -> Result<Value> {
     let mut child=core::hidden("powershell.exe").args(["-NoProfile","-NonInteractive","-Command",script]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(err)?;
     child.stdin.take().ok_or("Input is missing")?.write_all(input.to_string().as_bytes()).map_err(err)?;
@@ -14,59 +11,8 @@ fn powershell(script: &str, input: &Value) -> Result<Value> {
     if !out.status.success(){return Err(String::from_utf8_lossy(&out.stderr).to_string());}
     serde_json::from_str(String::from_utf8_lossy(&out.stdout).trim_start_matches('\u{feff}')).map_err(err)
 }
-#[cfg(windows)]
 pub fn hardware()->Result<Value>{
     powershell("$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; $o=Get-CimInstance Win32_OperatingSystem; $c=@(Get-CimInstance Win32_Processor); $p=@(Get-Process | Where-Object {$_.ProcessName -like '*llamafile*'}); @{ram_bytes=[double]$o.TotalVisibleMemorySize*1024;available_bytes=[double]$o.FreePhysicalMemory*1024;cpu=($c.Name -join ', ');threads=($c | Measure-Object NumberOfLogicalProcessors -Sum).Sum;model_ram_bytes=($p | Measure-Object WorkingSet64 -Sum).Sum} | ConvertTo-Json -Compress",&Value::Null)
-}
-#[cfg(not(windows))]
-pub fn hardware() -> Result<Value> {
-    // Read memory and CPU information from procfs.
-    let mem = fs::read_to_string("/proc/meminfo").unwrap_or_default();
-    let mut ram_bytes = 0.0f64;
-    let mut available_bytes = 0.0f64;
-    for line in mem.lines() {
-        if let Some(value) = line.strip_prefix("MemTotal:") {
-            ram_bytes = value.trim().trim_end_matches("kB").trim().parse::<f64>().unwrap_or(0.0) * 1024.0;
-        } else if let Some(value) = line.strip_prefix("MemAvailable:") {
-            available_bytes = value.trim().trim_end_matches("kB").trim().parse::<f64>().unwrap_or(0.0) * 1024.0;
-        }
-    }
-    let cpuinfo = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
-    let mut cpu = String::new();
-    let mut threads = 0u64;
-    for line in cpuinfo.lines() {
-        if cpu.is_empty() {
-            if let Some((_, value)) = line.split_once(':') {
-                if line.starts_with("model name") {
-                    cpu = value.trim().to_string();
-                }
-            }
-        }
-        if line.starts_with("processor") {
-            threads += 1;
-        }
-    }
-    // Sum the resident memory of llamafile processes.
-    let mut model_ram_bytes = 0.0f64;
-    if let Ok(entries) = fs::read_dir("/proc") {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if !name.bytes().all(|b| b.is_ascii_digit()) {
-                continue;
-            }
-            let cmdline = fs::read_to_string(format!("/proc/{name}/cmdline")).unwrap_or_default();
-            if !cmdline.contains("llamafile") {
-                continue;
-            }
-            let status = fs::read_to_string(format!("/proc/{name}/status")).unwrap_or_default();
-            for line in status.lines() {
-                if let Some(value) = line.strip_prefix("VmRSS:") {
-                    model_ram_bytes += value.trim().trim_end_matches("kB").trim().parse::<f64>().unwrap_or(0.0) * 1024.0;
-                }
-            }
-        }
-    }
-    Ok(json!({"ram_bytes": ram_bytes, "available_bytes": available_bytes, "cpu": cpu, "threads": threads, "model_ram_bytes": model_ram_bytes}))
 }
 fn size(path:&Path)->u64{
     let Ok(meta)=fs::symlink_metadata(path) else{return 0};
@@ -178,12 +124,11 @@ fn encode(text:&str)->String{text.bytes().map(|b|if b.is_ascii_alphanumeric()||b
 pub fn web_search(data:&Value)->Result<Value>{
     let query=data["query"].as_str().ok_or("Search query is missing")?;
     let url=format!("https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={}&gsrlimit=4&prop=extracts|info&inprop=url&exintro=1&explaintext=1&exchars=1400&format=json",encode(query));
-    let out=core::curl().args(["-fsSL","--max-time","25","-A","AI-USB/0.6 (personal desktop assistant)",&url]).output().map_err(err)?;
+    let out=core::hidden("curl.exe").args(["-fsSL","--max-time","25","-A","AI-USB/0.6 (personal desktop assistant)",&url]).output().map_err(err)?;
     if !out.status.success(){return Err("Online search failed".into());}
     let data:Value=serde_json::from_slice(&out.stdout).map_err(err)?;
     let hits:Vec<Value>=data["query"]["pages"].as_object().into_iter().flat_map(|p|p.values()).map(|p|json!({"name":p["title"],"url":p["fullurl"],"text":p["extract"]})).collect();Ok(json!(hits))
 }
-#[cfg(windows)]
 pub fn speech(data:&Value)->Result<Value>{
     static SPEECH:std::sync::Mutex<()>=std::sync::Mutex::new(());
     let _guard=SPEECH.try_lock().map_err(|_|"A speech request is already running")?;
@@ -194,38 +139,10 @@ pub fn speech(data:&Value)->Result<Value>{
         powershell("$ErrorActionPreference='Stop'; [Console]::InputEncoding=[Text.Encoding]::UTF8; $d=[Console]::In.ReadToEnd()|ConvertFrom-Json; Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; try {$v=$s.GetInstalledVoices()|Where-Object {$_.VoiceInfo.Culture.Name -like 'nl-*'}|Select-Object -First 1; if($v){$s.SelectVoice($v.VoiceInfo.Name)}; $s.Speak([string]$d.text); '{\"ok\":true}'} finally {$s.Dispose()}",data)
     }
 }
-#[cfg(not(windows))]
-pub fn speech(data:&Value)->Result<Value>{
-    static SPEECH:std::sync::Mutex<()>=std::sync::Mutex::new(());
-    let _guard=SPEECH.try_lock().map_err(|_|"A speech request is already running")?;
-    if data["action"]=="listen"{
-        return Err("Offline speech recognition is not available on this platform. Use the text input instead.".into());
-    }
-    let text=data["text"].as_str().ok_or("Text to read aloud is missing")?;
-    if text.len()>40_000{return Err("Text to read aloud is missing or too long".into());}
-    // Use whichever common speech synthesizer is installed.
-    for program in ["spd-say","espeak-ng","espeak"]{
-        let mut command=core::hidden(program);
-        if program=="spd-say"{command.args(["--wait",text]);}else{command.arg(text);}
-        if command.status().is_ok_and(|status|status.success()){
-            return Ok(json!({"ok":true}));
-        }
-    }
-    Err("No speech synthesizer found. Install spd-say, espeak-ng, or espeak.".into())
-}
-#[cfg(windows)]
 pub fn open_url(data:&Value)->Result<Value>{
     let url=data["url"].as_str().ok_or("URL is missing")?;
     crate::web_pages::validate(url)?;
     powershell("$ErrorActionPreference='Stop'; $d=[Console]::In.ReadToEnd()|ConvertFrom-Json; Start-Process ([string]$d.url); '{\"ok\":true}'",data)
-}
-#[cfg(not(windows))]
-pub fn open_url(data:&Value)->Result<Value>{
-    let url=data["url"].as_str().ok_or("URL is missing")?;
-    crate::web_pages::validate(url)?;
-    let status=core::hidden("xdg-open").arg(url).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().map_err(err)?;
-    if !status.success(){return Err("Could not open the URL in a browser".into());}
-    Ok(json!({"ok":true}))
 }
 
 #[cfg(test)]mod tests{

@@ -1,6 +1,5 @@
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::{
     fs::{self, File, OpenOptions},
@@ -29,54 +28,10 @@ pub fn id() -> String {
             .as_nanos()
     )
 }
-#[cfg(windows)]
 pub fn hidden(command: &str) -> Command {
     let mut c = Command::new(command);
     c.creation_flags(0x08000000);
     c
-}
-#[cfg(not(windows))]
-pub fn hidden(command: &str) -> Command {
-    Command::new(command)
-}
-// curl ships as curl.exe on Windows and curl on Unix-like systems.
-#[cfg(windows)]
-const CURL: &str = "curl.exe";
-#[cfg(not(windows))]
-const CURL: &str = "curl";
-
-/// A curl command for the current platform.
-pub fn curl() -> Command {
-    hidden(CURL)
-}
-
-/// A shell command that runs `script` with the platform's shell.
-/// Windows uses PowerShell; Unix-like systems use `sh -c`.
-#[cfg(windows)]
-pub fn shell_command(script: &str) -> Command {
-    let mut c = hidden("powershell.exe");
-    c.args(["-NoProfile", "-NonInteractive", "-Command", script]);
-    c
-}
-#[cfg(not(windows))]
-pub fn shell_command(script: &str) -> Command {
-    let mut c = hidden("sh");
-    c.args(["-c", script]);
-    c
-}
-
-/// Terminate a process and its children.
-#[cfg(windows)]
-pub fn kill_tree(pid: u32) {
-    let _ = hidden("taskkill")
-        .args(["/PID", &pid.to_string(), "/T", "/F"])
-        .output();
-}
-#[cfg(unix)]
-pub fn kill_tree(pid: u32) {
-    unsafe {
-        libc::kill(pid as i32, libc::SIGKILL);
-    }
 }
 pub fn root() -> Result<PathBuf> {
     let exe = std::env::current_exe().map_err(err)?;
@@ -194,7 +149,6 @@ pub fn validate(cfg: &Value) -> Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
 #[link(name = "kernel32")]
 extern "system" {
     fn CreateJobObjectW(attr:*const u8,name:*const u16)->isize;
@@ -208,25 +162,15 @@ extern "system" {
     fn WaitForSingleObject(h: isize, timeout: u32) -> u32;
     fn ReleaseMutex(h: isize) -> i32;
 }
-#[cfg(windows)]
 pub fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
 }
-#[cfg(windows)]
 pub struct Lock(isize);
-#[cfg(unix)]
-pub struct Lock(File);
-#[cfg(windows)]
 #[repr(C)]
 struct BasicJobLimits { process_time:i64,job_time:i64,flags:u32,min_working:usize,max_working:usize,active:u32,affinity:usize,priority:u32,scheduling:u32 }
-#[cfg(windows)]
 #[repr(C)]
 struct JobLimits { basic:BasicJobLimits,io:[u64;6],process_memory:usize,job_memory:usize,peak_process:usize,peak_job:usize }
-#[cfg(windows)]
 pub struct ProcessJob(isize);
-#[cfg(unix)]
-pub struct ProcessJob;
-#[cfg(windows)]
 impl ProcessJob {
     pub fn new()->Result<Self>{unsafe{
         let job=CreateJobObjectW(std::ptr::null(),std::ptr::null());
@@ -238,13 +182,7 @@ impl ProcessJob {
         Ok(Self(job))
     }}
 }
-#[cfg(unix)]
-impl ProcessJob {
-    pub fn new() -> Result<Self> { Ok(Self) }
-}
-#[cfg(windows)]
 impl Drop for ProcessJob {fn drop(&mut self){unsafe{CloseHandle(self.0);}}}
-#[cfg(windows)]
 impl Lock {
     pub fn acquire(name: &str) -> Result<Self> {
         unsafe {
@@ -261,38 +199,12 @@ impl Lock {
         }
     }
 }
-#[cfg(unix)]
-impl Lock {
-    pub fn acquire(name: &str) -> Result<Self> {
-        use std::os::unix::io::AsRawFd;
-        let path = std::env::temp_dir()
-            .join(format!("orvyn-{}.lock", name.replace(['\\', '/', ':'], "_")));
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&path)
-            .map_err(err)?;
-        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err("Another action is still running".into());
-        }
-        Ok(Self(file))
-    }
-}
-#[cfg(windows)]
 impl Drop for Lock {
     fn drop(&mut self) {
         unsafe {
             ReleaseMutex(self.0);
             CloseHandle(self.0);
         }
-    }
-}
-#[cfg(unix)]
-impl Drop for Lock {
-    fn drop(&mut self) {
-        use std::os::unix::io::AsRawFd;
-        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
     }
 }
 pub fn atomic(path: &Path, value: &Value) -> Result<()> {
@@ -310,14 +222,7 @@ fn atomic_write(path: &Path, value: &Value, durable: bool) -> Result<()> {
         f.write_all(&serde_json::to_vec_pretty(value).map_err(err)?)
             .map_err(err)?;
         if durable { f.sync_all().map_err(err)?; }
-        #[cfg(unix)]
-        {
-            // Keep configuration, chats, and provider keys private to this user.
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&temp, fs::Permissions::from_mode(0o600)).map_err(err)?;
-        }
         drop(f);
-        #[cfg(windows)]
         if unsafe {
             MoveFileExW(
                 wide(&temp.to_string_lossy()).as_ptr(),
@@ -328,14 +233,11 @@ fn atomic_write(path: &Path, value: &Value, durable: bool) -> Result<()> {
         {
             return Err(err(std::io::Error::last_os_error()));
         }
-        #[cfg(not(windows))]
-        fs::rename(&temp, path).map_err(err)?;
         Ok(())
     })();
     let _ = fs::remove_file(temp);
     result
 }
-#[cfg(windows)]
 fn identity(pid: u32) -> Option<u64> {
     unsafe {
         let h = OpenProcess(0x1000, 0, pid);
@@ -351,13 +253,6 @@ fn identity(pid: u32) -> Option<u64> {
             None
         }
     }
-}
-#[cfg(unix)]
-fn identity(pid: u32) -> Option<u64> {
-    // Use the process start time from /proc so PID reuse is detected.
-    let stat = fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    let rest = stat.rsplit_once(')')?.1;
-    rest.split_whitespace().nth(19)?.parse().ok()
 }
 pub fn online(cfg: &Value, key: &str) -> bool {
     let p = cfg["services"][key]["port"].as_u64().unwrap_or(0) as u16;
@@ -392,21 +287,12 @@ pub fn service(root: &Path, key: &str, start: bool) -> Result<String> {
     });
     if !start {
         if let Some(pid) = owned {
-            #[cfg(windows)]
-            {
-                let output = hidden("taskkill")
-                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                    .output()
-                    .map_err(err)?;
-                if !output.status.success() {
-                    return Err(String::from_utf8_lossy(&output.stderr).into());
-                }
-            }
-            #[cfg(unix)]
-            {
-                if unsafe { libc::kill(pid as i32, libc::SIGTERM) } != 0 {
-                    return Err(err(std::io::Error::last_os_error()));
-                }
+            let output = hidden("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output()
+                .map_err(err)?;
+            if !output.status.success() {
+                return Err(String::from_utf8_lossy(&output.stderr).into());
             }
             let _ = fs::remove_file(pidfile);
             return Ok(format!("{key} stopped"));
@@ -493,7 +379,6 @@ pub fn save_chats(cfg: &Value, state: &mut Value) -> Result<()> {
     state["revision"] = Value::String(id());
     atomic(&path(cfg, "data").join("chats.json"), state)
 }
-#[cfg_attr(not(windows), allow(dead_code))]
 pub fn chat(cfg: &Value, key: &str, messages: Value) -> Result<String> {
     let response = chat_response(
         cfg,
@@ -517,7 +402,7 @@ pub fn chat_response(cfg: &Value, key: &str, mut body: Value) -> Result<Value> {
     let port = cfg["services"][key]["port"]
         .as_u64()
         .ok_or("Onbekend model")?;
-    let mut child = hidden(CURL)
+    let mut child = hidden("curl.exe")
         .args([
             "--silent",
             "--show-error",
@@ -558,7 +443,7 @@ pub fn stream_response(cfg:&Value,key:&str,mut body:Value,mut emit:impl FnMut(St
     use std::io::{BufRead,BufReader};
     body["stream"]=json!(true);body["stream_options"]=json!({"include_usage":true});
     let port=cfg["services"][key]["port"].as_u64().ok_or("Onbekend model")?;
-    let mut child=hidden(CURL).args(["-sS","-N","--fail-with-body","--max-time","300","--noproxy","*","-H","Content-Type: application/json","--data-binary","@-",&format!("http://127.0.0.1:{port}/v1/chat/completions")]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(err)?;
+    let mut child=hidden("curl.exe").args(["-sS","-N","--fail-with-body","--max-time","300","--noproxy","*","-H","Content-Type: application/json","--data-binary","@-",&format!("http://127.0.0.1:{port}/v1/chat/completions")]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(err)?;
     child.stdin.take().ok_or("Input is missing")?.write_all(body.to_string().as_bytes()).map_err(err)?;
     let mut content=String::new();let mut usage=Value::Null;let mut complete=false;
     let result=(||->Result<()>{
@@ -597,7 +482,6 @@ pub fn backup(cfg: &Value) -> Result<PathBuf> {
     zip.finish().map_err(err)?;
     Ok(file)
 }
-#[cfg_attr(not(windows), allow(dead_code))]
 pub fn restore(cfg: &Value, root: &Path, file: &Path) -> Result<String> {
     fn catalog_valid(data: &Value) -> bool {
         data["models"].as_array().is_some_and(|entries| {
@@ -695,7 +579,7 @@ pub fn download(
     let mut retries=0;
     'transfer: loop {
     if cancel.load(Ordering::Relaxed) {return Ok("Download paused".into());}
-    let mut child = hidden(CURL)
+    let mut child = hidden("curl.exe")
         .args([
             "--silent",
             "--show-error",
@@ -859,12 +743,8 @@ mod tests {
     #[test]
     fn native_service_lifecycle() {
         let root = root().unwrap().join("tests").join(format!("ai-usb-process-{}", id()));
-        #[cfg(windows)]
-        let (command, args) = ("ping.exe", json!(["-t", "127.0.0.1"]));
-        #[cfg(unix)]
-        let (command, args) = ("sleep", json!(["300"]));
         let cfg = json!({"paths":{"data":root.join("data"),"backups":root.join("backups"),"models":root.join("models"),"logs":root.join("logs")},
-            "services":{"test":{"port":59998,"command":command,"args":args}}});
+            "services":{"test":{"port":59998,"command":"ping.exe","args":["-t","127.0.0.1"]}}});
         atomic(&root.join("config/settings.json"), &cfg).unwrap();
         service(&root, "test", true).unwrap();
         let first = read_json(&root.join("data/processes/test.rust.json")).unwrap();

@@ -59,7 +59,7 @@ pub fn read(root:&Path,data:&Value)->Result<Value>{
  let result=(||{
   for _ in 0..4 {
    let ip=address(&url)?;let pinned=format!("{}:443:{ip}",url.host_str().unwrap());
-   let output=core::curl().args(["--silent","--show-error","--noproxy","*","--proto","=https","--connect-timeout","5","--max-time","15","--max-filesize","2000000","--resolve",&pinned,"-A","Orvyn/1 (web page reader)","-D"]).arg(&headers).arg("-o").arg(&body).args(["-w","%{http_code}","--url",url.as_str()]).output().map_err(err)?;
+   let output=core::hidden("curl.exe").args(["--silent","--show-error","--noproxy","*","--proto","=https","--connect-timeout","5","--max-time","15","--max-filesize","2000000","--resolve",&pinned,"-A","Orvyn/1 (web page reader)","-D"]).arg(&headers).arg("-o").arg(&body).args(["-w","%{http_code}","--url",url.as_str()]).output().map_err(err)?;
    if !output.status.success(){return Err("Website could not be read (network error, timeout, or page too large).".into());}
    let status=String::from_utf8_lossy(&output.stdout).trim().parse::<u16>().map_err(err)?;
    let head=fs::read_to_string(&headers).map_err(err)?;

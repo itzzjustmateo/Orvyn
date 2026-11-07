@@ -16,7 +16,7 @@ const MAX_PROJECTOR: u64 = 5_000_000_000;
 static SEARCHING: AtomicBool = AtomicBool::new(false);
 
 fn get(url: &str, timeout: &str) -> Result<Value> {
-    let output = core::curl()
+    let output = core::hidden("curl.exe")
         .args([
             "--silent",
             "--show-error",

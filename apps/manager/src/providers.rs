@@ -4,19 +4,15 @@ use serde_json::{json, Value};
 use std::{io::{Read, Write}, path::PathBuf, process::Stdio,
     sync::{Mutex, atomic::{AtomicBool, Ordering}, mpsc}, time::Duration};
 
-#[cfg(windows)]
 #[repr(C)]
 struct Blob { len: u32, data: *mut u8 }
-#[cfg(windows)]
 #[link(name="crypt32")]
 extern "system" {
     fn CryptProtectData(input:*const Blob, description:*const u16, entropy:*const Blob, reserved:*mut std::ffi::c_void, prompt:*mut std::ffi::c_void, flags:u32, output:*mut Blob)->i32;
     fn CryptUnprotectData(input:*const Blob, description:*mut *mut u16, entropy:*const Blob, reserved:*mut std::ffi::c_void, prompt:*mut std::ffi::c_void, flags:u32, output:*mut Blob)->i32;
 }
-#[cfg(windows)]
 #[link(name="kernel32")]
 extern "system" { fn LocalFree(memory:*mut std::ffi::c_void)->*mut std::ffi::c_void; }
-#[cfg(windows)]
 fn crypt(bytes:&[u8], protect:bool)->Result<Vec<u8>> {
     let input=Blob{len:bytes.len() as u32,data:bytes.as_ptr() as *mut u8};
     let mut output=Blob{len:0,data:std::ptr::null_mut()};
@@ -29,20 +25,9 @@ fn crypt(bytes:&[u8], protect:bool)->Result<Vec<u8>> {
     unsafe{LocalFree(output.data.cast());}
     Ok(result)
 }
-#[cfg(windows)]
 fn protect(key:&str)->Result<String>{Ok(base64::engine::general_purpose::STANDARD.encode(crypt(key.as_bytes(),true)?))}
-#[cfg(windows)]
 fn unprotect(value:&str)->Result<String>{
     String::from_utf8(crypt(&base64::engine::general_purpose::STANDARD.decode(value).map_err(|_|"Invalid key storage")?,false)?).map_err(err)
-}
-// Without DPAPI, keys are still base64-encoded at rest and the providers file
-// is written atomically. On Unix-like systems protect the config directory with
-// filesystem permissions; Windows keeps using DPAPI above.
-#[cfg(not(windows))]
-fn protect(key:&str)->Result<String>{Ok(base64::engine::general_purpose::STANDARD.encode(key.as_bytes()))}
-#[cfg(not(windows))]
-fn unprotect(value:&str)->Result<String>{
-    String::from_utf8(base64::engine::general_purpose::STANDARD.decode(value).map_err(|_|"Invalid key storage")?).map_err(err)
 }
 fn endpoint(kind:&str, custom:&str)->Result<String>{
     let base = match kind {
@@ -176,7 +161,7 @@ impl Providers {
         let mut config=format!("url = {}\nheader = \"Content-Type: application/json\"\n",serde_json::to_string(&url).map_err(err)?);
         if !key.is_empty(){config.push_str(&format!("header = {}\n",serde_json::to_string(&format!("Authorization: Bearer {key}")).map_err(err)?));}
         if let Some(body)=body{config.push_str(&format!("data-binary = {}\n",serde_json::to_string(&body.to_string()).map_err(err)?));}
-        let mut child=core::curl().args(["-q","--silent","--no-buffer","--include","--suppress-connect-headers","--globoff","--connect-timeout","15","--max-time","300","--config","-"])
+        let mut child=core::hidden("curl.exe").args(["-q","--silent","--no-buffer","--include","--suppress-connect-headers","--globoff","--connect-timeout","15","--max-time","300","--config","-"])
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(err)?;
         let stdout=child.stdout.take().ok_or("API output is missing")?;
         let (tx,rx)=mpsc::sync_channel(8);

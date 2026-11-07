@@ -14,13 +14,12 @@
 
 <h1 align="center">Orvyn</h1>
 
-<p align="center">Local AI chat and a coding workspace, together in one portable Windows and Linux app.</p>
+<p align="center">Local AI chat and a coding workspace, together in one portable Windows app.</p>
 
 <p align="center">
   <a href="https://github.com/draftiermovie/Orvyn/actions/workflows/ci.yml"><img src="https://github.com/draftiermovie/Orvyn/actions/workflows/ci.yml/badge.svg" alt="CI build and tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Free%20redistribution-99e3cd" alt="Custom license: free redistribution, no resale"></a>
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-2563eb" alt="Windows 10 and 11">
-  <img src="https://img.shields.io/badge/Platform-Linux-f0b429" alt="Linux">
   <img src="https://img.shields.io/badge/Built%20with-Rust%20%2B%20React-e7b880" alt="Built with Rust and React">
 </p>
 
@@ -37,13 +36,13 @@ Orvyn brings AI chat, model discovery, documents, and **Opex Work** into a works
 - **Documents and sources** — import PDF, Word, Excel, text, and source files; ask questions using selected excerpts and view the sources supplied to the model.
 - **Portable by design** — keep app data alongside the executable and move the folder between writable locations. Models unload after 30 minutes of inactivity.
 - **English interface** — choose the response language and style in Settings, with startup diagnostics and experimental training reports available.
-- **Rust + React** — a native Rust host with a React, TypeScript, and Tailwind interface inside Windows WebView2 on Windows and WebKitGTK on Linux.
+- **Rust + React** — a native Rust host with a React, TypeScript, and Tailwind interface inside Windows WebView2.
 
 > [!NOTE]
 > Orvyn is under active development. The model-library and English-language updates are in source; older packaged builds may not include them. Check the [release notes](docs/RELEASE-NOTES-0.7.0.md) and the source commit associated with a download.
 
 > [!IMPORTANT]
-> Opex file actions are restricted to the chosen USB project. Approved shell commands (PowerShell on Windows, `sh` on Linux) run with your account permissions and can access other locations. Review commands before approval; they have a 60-second time limit.
+> Opex file actions are restricted to the chosen USB project. Approved PowerShell commands run with your Windows account permissions and can access other locations. Review commands before approval; they have a 60-second time limit.
 
 ![Orvyn Opex Work workspace](.github/opex-work.png)
 
@@ -53,13 +52,13 @@ Orvyn brings AI chat, model discovery, documents, and **Opex Work** into a works
 
 ### Run a packaged build
 
-Check [Releases](https://github.com/draftiermovie/Orvyn/releases) for published builds. On Windows, Orvyn requires **64-bit Windows 10/11** and the **Microsoft Edge WebView2 Runtime**. On Linux, it uses the system **WebKitGTK 4.1** runtime.
+Check [Releases](https://github.com/draftiermovie/Orvyn/releases) for published builds. Orvyn requires **64-bit Windows 10/11** and the **Microsoft Edge WebView2 Runtime**.
 
 | Package | What is included | Getting started |
 | --- | --- | --- |
 | Standard | Orvyn 1 and its inference runtime | Run the installer, then open `Orvyn.exe`. |
 | Without Orvyn 1 | App and runtime, without bundled model weights | Connect an API or download a compatible model. |
-| Portable folder | Files kept together in a movable folder | Open `Orvyn.exe` on Windows or `./start-orvyn.sh` on Linux. |
+| Portable folder | Files kept together in a movable folder | Open `Orvyn.exe` or the packaged `START.bat`. |
 
 For locally built 0.7.0 installers, the filenames are `Orvyn-Setup-0.7.0.exe` and `Orvyn-Setup-0.7.0-No-Orvyn-1.exe`. Keep the portable folder together: model weights and runtime files sit beside the executable rather than inside it. Updates preserve existing user configuration and conversations; uninstalling preserves user data and models.
 
@@ -83,39 +82,6 @@ Pop-Location
 ```
 
 The source repository excludes model weights and the inference runtime. Connect an API to begin, or supply the local runtime and a compatible model as described in the [development guide](docs/DEVELOPMENT.md). Initial dependency setup needs internet access; native builds and tests then use the locked offline cache.
-
-### Build and run on Linux
-
-Install Git, Node.js 22, Rust, `pkg-config`, and the WebKitGTK development packages. On Debian or Ubuntu:
-
-```bash
-sudo apt install build-essential pkg-config curl libwebkit2gtk-4.1-dev \
-  libjavascriptcoregtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev nodejs npm
-```
-
-Then use the Linux scripts directly or the bundled [just](https://github.com/casey/just) recipes:
-
-```bash
-git clone https://github.com/draftiermovie/Orvyn.git
-cd Orvyn
-just init
-just build      # UI bundle, Rust release build, and dist/orvyn-manager
-just run
-```
-
-| Recipe | Action |
-| --- | --- |
-| `just init` | Create `config/settings.json` from the example. |
-| `just ui` | Install npm dependencies and build the web UI bundle. |
-| `just desktop` | Build the Rust manager for Linux. |
-| `just deploy` | Copy the release binary to `dist/orvyn-manager`. |
-| `just build` | Run `ui`, `desktop`, and `deploy` in order. |
-| `just run` | Start Orvyn from `dist/`. |
-| `just package` | Stage `dist/Orvyn-portable-linux`. |
-| `just installer` | Build `dist/Orvyn-installer.sh`. |
-
-The equivalent scripts live in `scripts/*.sh` and can be run without `just`. Linux uses `sh -c` for Opex commands, `xdg-open` for links, and a portable `curl`; Windows keeps the native Win32 manager, PowerShell, and WebView2 paths. Speech output uses `spd-say`, `espeak-ng`, or `espeak` when one is installed.
 
 ## Documentation
 

@@ -221,18 +221,17 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
             });
         }
     });
-    #[cfg(windows)]
     use tao::platform::windows::WindowBuilderExtWindows;
     let icon=tao::window::Icon::from_rgba(include_bytes!("../assets/orvyn.rgba").to_vec(),256,256).map_err(err)?;
     let event_loop = EventLoop::new();
-    let builder = WindowBuilder::new()
+    let window = WindowBuilder::new()
         .with_title("Orvyn · AI Model Hub")
         .with_window_icon(Some(icon.clone()))
+        .with_taskbar_icon(Some(icon))
         .with_inner_size(LogicalSize::new(1200., 820.))
-        .with_min_inner_size(LogicalSize::new(800., 600.));
-    #[cfg(windows)]
-    let builder = builder.with_taskbar_icon(Some(icon));
-    let window = builder.build(&event_loop).map_err(err)?;
+        .with_min_inner_size(LogicalSize::new(800., 600.))
+        .build(&event_loop)
+        .map_err(err)?;
     let window_ms=started.elapsed().as_millis();
     startup.mark("window","Creating application window");
     // Profile and browser cache belong to the USB, not AppData on C:.

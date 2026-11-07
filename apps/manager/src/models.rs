@@ -176,7 +176,7 @@ impl Runtime {
                 if self.closing.load(Ordering::Relaxed)||self.cancel_generation.load(Ordering::Relaxed){return Err("Request stopped".into());}
                 if !core::service_owned(&cfg,key){return Err("Model failed to load. Check the service log for compatibility issues or missing files.".into());}
                 let url=format!("http://127.0.0.1:{}/health",cfg["services"][key]["port"]);
-                let output=core::curl().args(["-sS","--noproxy","*","--max-time","2",&url]).output().map_err(err)?;
+                let output=core::hidden("curl.exe").args(["-sS","--noproxy","*","--max-time","2",&url]).output().map_err(err)?;
                 if serde_json::from_slice::<Value>(&output.stdout).ok().is_some_and(|v|v["status"]=="ok"){healthy=true;break;}
                 std::thread::sleep(Duration::from_secs(1));
             }

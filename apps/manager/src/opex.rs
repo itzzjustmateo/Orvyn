@@ -59,12 +59,12 @@ fn run_command(root:&Path,dir:&Path,command:&str,cancel:Option<&AtomicBool>,stat
     let log=logs.join(format!("{}.log",core::id()));let file=fs::File::create(&log).map_err(err)?;
     let temp=root.join("tools/temp");fs::create_dir_all(&temp).map_err(err)?;
     if cancel.is_some_and(|v|v.load(Ordering::SeqCst)){return Ok(json!({"cancelled":true,"output":"","exit_code":null}));}
-    let mut child=core::shell_command(command).current_dir(dir).env("TEMP",&temp).env("TMP",&temp).stdin(Stdio::null()).stdout(file.try_clone().map_err(err)?).stderr(file).spawn().map_err(err)?;
+    let mut child=core::hidden("powershell.exe").args(["-NoProfile","-NonInteractive","-Command",command]).current_dir(dir).env("TEMP",&temp).env("TMP",&temp).stdin(Stdio::null()).stdout(file.try_clone().map_err(err)?).stderr(file).spawn().map_err(err)?;
     let start=Instant::now();let mut last=Instant::now();let mut timed_out=false;let mut cancelled=false;
     let code=loop{
         if let Some(status)=child.try_wait().map_err(err)?{break status.code();}
         cancelled=cancel.is_some_and(|v|v.load(Ordering::SeqCst));timed_out=start.elapsed()>Duration::from_secs(60);
-        if cancelled||timed_out{core::kill_tree(child.id());let _=child.kill();let _=child.wait();break None;}
+        if cancelled||timed_out{let _=core::hidden("taskkill.exe").args(["/PID",&child.id().to_string(),"/T","/F"]).output();let _=child.kill();let _=child.wait();break None;}
         if last.elapsed()>Duration::from_millis(500){
             if let Some(state)=state{if let Ok(mut value)=state.lock(){value["output"]=json!(log_output(&log).unwrap_or_default());}}
             last=Instant::now();

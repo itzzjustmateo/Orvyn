@@ -6,36 +6,6 @@ For the supported MSVC build, use 64-bit Windows, Node.js 22, Rust 1.97.1 with t
 
 The desktop scripts detect the installed Rust host. MSVC builds use Visual Studio tools discovered by `vswhere`; GNU builds use the project-local LLVM/MinGW tools at the path in `scripts/rust-environment.ps1`. That script changes compiler paths for the current process only.
 
-## Linux
-
-Linux uses the system Rust toolchain and WebKitGTK. Install Node.js 22, Rust, `pkg-config`, and the WebKitGTK 4.1 development packages. On Debian or Ubuntu:
-
-```bash
-sudo apt install build-essential pkg-config curl libwebkit2gtk-4.1-dev \
-  libjavascriptcoregtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev nodejs npm
-```
-
-From the repository root, either run the shell scripts or use the `justfile`:
-
-```bash
-./scripts/init-config.sh
-just build      # build-ui.sh, build-desktop.sh, deploy-desktop.sh
-just run        # start dist/orvyn-manager
-```
-
-`scripts/usb-environment.sh` sets `CARGO_HOME`, `CARGO_TARGET_DIR` (`apps/manager/build-usb`), and the npm cache inside the repository. Linux uses `sh -c` for approved Opex commands, `xdg-open` for links, `libc::kill` for stopping services, and base64 at rest for API keys because Windows DPAPI is unavailable. The native Win32 manager window is Windows-only; on Linux the web interface is the supported UI, while `manager-test` reports that the native smoke test is unavailable. Speech output tries `spd-say`, `espeak-ng`, and `espeak`; offline speech recognition is not available.
-
-Build a portable folder and installer with:
-
-```bash
-just package
-just installer
-./dist/Orvyn-installer.sh --prefix "$HOME/.local/share/orvyn" --yes
-```
-
-The installer preserves existing configuration, conversations, models, logs, and backups on update.
-
 ## Build and run
 
 From the repository root:
@@ -105,7 +75,7 @@ Always rebuild both the web bundle and desktop executable before packaging a new
 | --- | --- |
 | `apps/web-ui` | React, TypeScript, and CSS interface |
 | `apps/manager` | Rust desktop host and local APIs |
-| `scripts` | Environment, build, test, and packaging commands (`.ps1` on Windows, `.sh` on Linux) |
+| `scripts` | Environment, build, test, and packaging commands |
 | `config/*.example.json` | Clean configuration templates with the Orvyn 1 profile |
 | `tests` | Source tests; generated fixtures and screenshots are ignored |
 | `tools/training` | Optional CPU training utilities |

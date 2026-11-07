@@ -15,6 +15,3 @@ tao = "0.34"
 tiny_http = "0.12"
 
 url = "2"
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"

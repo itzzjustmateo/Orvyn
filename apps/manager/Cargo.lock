@@ -13,7 +13,6 @@ name = "ai-usb-manager"
 version = "0.7.0"
 dependencies = [
  "base64",
- "libc",
  "serde_json",
  "sha2",
  "tao",

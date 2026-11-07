@@ -4,7 +4,6 @@
 !/.gitattributes
 !/AGENTS.md
 !/README.md
-!/justfile
 !/START.bat
 !/ORVYN.bat
 !/BEHEER.bat
@@ -51,7 +50,6 @@
 !/scripts/*.ps1
 !/scripts/*.bat
 !/scripts/*.cmd
-!/scripts/*.sh
 /tests/*
 !/tests/*.mjs
 !/tests/*.py

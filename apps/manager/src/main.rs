@@ -1,4 +1,4 @@
-#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod core;
 mod web;
 mod models;
@@ -10,10 +10,6 @@ mod web_pages;
 mod opex;
 mod diagnostics;
 mod training;
-#[cfg(windows)]
-mod window;
-#[cfg(not(windows))]
-#[path = "window_linux.rs"]
 mod window;
 
 fn main() {
