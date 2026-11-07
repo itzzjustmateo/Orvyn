@@ -20,7 +20,7 @@ The current installer EXEs reuse an older desktop executable. The current source
 
 **Priority:** High
 
-The existing installer test assumes one bundled model. Extend it to cover both variants and upgrades using synthetic fixtures.
+Add installer coverage for both variants and upgrades using synthetic fixtures.
 
 **Acceptance criteria**
 

@@ -42,7 +42,6 @@
 /apps/manager/packaging/*
 !/apps/manager/packaging/installer.iss
 !/apps/manager/packaging/INSTALL.txt
-!/apps/manager/packaging/test-installer.ps1
 !/apps/manager/packaging/licenses/
 
 /config/*
@@ -108,3 +107,8 @@
 
 # Repository commit-message guidance
 !/.cursor/
+
+# Local PowerShell tests
+test-*.ps1
+*.Tests.ps1
+/tests/**/*.ps1

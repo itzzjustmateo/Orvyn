@@ -38,7 +38,7 @@ Open **Tools & preferences** above the input field.
 
 ## Development checks
 
-- `scripts/test-desktop.ps1`: Rust tests for inactivity policy, document sources, hardware data, and vision-projector verification.
+- [Native Cargo tests](DEVELOPMENT.md#local-checks): Rust tests for inactivity policy, document sources, hardware data, and vision-projector verification.
 - `tests/workspace-ui.mjs`: browser integration using controlled API responses and installed Edge. Initialize `scripts/usb-environment.ps1` before starting Node.
 - `scripts/build-ui.ps1`, `scripts/build-desktop.ps1`, and `scripts/deploy-desktop.ps1`: build and deploy to the USB, backing up previous executables.
 

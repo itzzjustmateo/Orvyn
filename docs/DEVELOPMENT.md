@@ -37,12 +37,11 @@ node apps/web-ui/node_modules/typescript/bin/tsc --project apps/web-ui/tsconfig.
 node tests/chat-client.mjs
 node tests/workspace-ui.mjs
 node tests/opex-work-ui.mjs
-.\scripts\test-manager.ps1
+. .\scripts\rust-environment.ps1
+cargo test --manifest-path apps/manager/Cargo.toml --release --locked --offline --jobs 4 -- --test-threads=2
 ```
 
 Browser tests use Microsoft Edge, mocked model responses, and generated fixtures. Native tests exercise local file operations, backups, streaming, providers, and PowerShell. Tests requiring a live Qwen service or live Hugging Face search are explicitly ignored by default. GitHub CI runs these source checks and the native release build; see [GitHub setup](GITHUB.md).
-
-`scripts/test-workspace-api.ps1` and `scripts/test-installer.ps1` are additional integration checks requiring their corresponding runtime/build inputs. The installer test currently assumes the standard model-bundled package.
 
 ## Portable packages and installers
 

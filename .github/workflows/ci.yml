@@ -88,6 +88,8 @@ jobs:
       - name: Prepare locked Cargo cache
         run: ./scripts/prepare-cargo-cache.ps1
       - name: Run native tests offline
-        run: ./scripts/test-manager.ps1
+        run: |
+          . ./scripts/rust-environment.ps1
+          cargo test --manifest-path apps/manager/Cargo.toml --release --locked --offline --jobs 4 -- --test-threads=2
       - name: Build desktop executable offline
         run: ./scripts/build-desktop.ps1
