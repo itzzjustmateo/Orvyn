@@ -13,4 +13,4 @@ const source=resolve('src/app/globals.css');
 const result=await postcss([tailwind({base:process.cwd()})]).process(await readFile(source,'utf8'),{from:source,to:resolve('dist/app.css')});
 await writeFile('dist/app.css',result.css);
 await writeFile('dist/index.html','<!doctype html><html lang="en" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Orvyn · AI Model Hub</title><link rel="icon" href="/orvyn-logo.png"><link rel="stylesheet" href="/app.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
-console.log('Desktopinterface uit page.tsx en globals.css gebundeld.');
+console.log('Desktop interface bundled from page.tsx and globals.css.');

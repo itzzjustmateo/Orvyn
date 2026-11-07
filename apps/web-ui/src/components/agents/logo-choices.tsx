@@ -11,7 +11,7 @@ return <section aria-label="Logo-ontwerpen" className="space-y-5">
 <div className="flex h-32 items-center justify-center gap-7"><img alt={logo.name+" logo-ontwerp"} src={"data:image/svg+xml,"+encodeURIComponent(logo.svg)} className="size-24"/><div className="space-y-3 border-l border-white/10 pl-6"><img alt="" src={"data:image/svg+xml,"+encodeURIComponent(logo.svg)} className="size-8"/><img alt="" src={"data:image/svg+xml,"+encodeURIComponent(logo.svg)} className="size-4"/></div></div>
 <h4 className="font-semibold">{logo.name}</h4><p className="mt-1 text-xs leading-relaxed text-gray-400">{logo.description}</p>
 </label>)}</div></fieldset>
-<div role="status" className="rounded-xl bg-white/5 p-3 text-sm">{chosen?chosen.name+" staat as preference klaar. Not approved or applied yet.":"No design selected yet."}</div>
+<div role="status" className="rounded-xl bg-white/5 p-3 text-sm">{chosen?chosen.name+" is ready as a preference. Not approved or applied yet.":"No design selected yet."}</div>
 {selected&&<button className="text-sm text-gray-400 underline" onClick={()=>onSelect("")}>Clear preference</button>}
 </section>;
 }

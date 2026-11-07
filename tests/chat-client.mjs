@@ -41,7 +41,7 @@ test('UTF-8 characters and events survive chunk boundaries', async () => {
   }, {check: async request => assert.equal((await request()).choices[0].message.content,'hé 😀')});
 });
 test('truncated stream is rejected', async () => {
-  await withStream(c => c.close(), {check: async request => assert.rejects(request,/onderbroken/)});
+  await withStream(c => c.close(), {check: async request => assert.rejects(request,/interrupted/)});
 });
 test('model errors cancel the body', async () => {
   await withStream(c => c.enqueue(chunk('data: {"error":{"message":"model failed"}}\n\n')), {

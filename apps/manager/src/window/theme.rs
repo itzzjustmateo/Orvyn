@@ -251,7 +251,7 @@ pub unsafe fn handle(app: &App, msg: u32, w: usize, l: isize) -> Option<isize> {
                     }
                     let title = app.state["chats"][item.item as usize]["title"]
                         .as_str()
-                        .unwrap_or("Gesprek");
+                        .unwrap_or("Conversation");
                     text(item.dc, title, &mut r, 16, TEXT, 0x8024);
                 }
             } else {
@@ -292,13 +292,13 @@ pub fn copy(hwnd: H, value: &str) -> Result<()> {
         let memory = GlobalAlloc(2, data.len() * 2);
         if memory == 0 {
             CloseClipboard();
-            return Err("Klembordgeheugen ontbreekt".into());
+            return Err("Clipboard memory is missing".into());
         }
         let target = GlobalLock(memory);
         if target.is_null() {
             GlobalFree(memory);
             CloseClipboard();
-            return Err("Klembord openen mislukt".into());
+            return Err("Failed to open clipboard".into());
         }
         std::ptr::copy_nonoverlapping(data.as_ptr(), target, data.len());
         GlobalUnlock(memory);
@@ -306,7 +306,7 @@ pub fn copy(hwnd: H, value: &str) -> Result<()> {
         if SetClipboardData(13, memory) == 0 {
             GlobalFree(memory);
             CloseClipboard();
-            return Err("Kopiëren mislukt".into());
+            return Err("Copy failed".into());
         }
         CloseClipboard();
         Ok(())
@@ -401,7 +401,7 @@ unsafe extern "system" fn chat_proc(hwnd: H, msg: u32, w: usize, l: isize) -> is
             );
             text(
                 dc,
-                "Kies een model en stel hieronder je vraag.",
+                "Choose a model and enter your question below.",
                 &mut Rect {
                     left: 20,
                     top: y + 110,

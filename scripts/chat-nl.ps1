@@ -4,20 +4,20 @@ $ErrorActionPreference = "Stop"
 $config = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\config\settings.json') -Raw | ConvertFrom-Json
 $server = "http://127.0.0.1:$($config.services.qwen3.port)"
 $model = "qwen3"
-$system = "Je bent een behulpzame assistent. Je antwoordt ALTIJD in het Nederlands, ongeacht de taal die de gebruiker gebruikt."
+$system = "You are a helpful assistant. Respond in English by default unless the user requests another language."
 
 try {
     Invoke-RestMethod -Uri "$server/health" -TimeoutSec 5 | Out-Null
 } catch {
     Write-Host ""
-    Write-Host "De modelserver op $server is niet bereikbaar." -ForegroundColor Red
-    Write-Host "Start de services met START.bat op de USB." -ForegroundColor Yellow
+    Write-Host "The model server at $server is unreachable." -ForegroundColor Red
+    Write-Host "Start the services using START.bat on the USB." -ForegroundColor Yellow
     exit 1
 }
 
 Write-Host ""
-Write-Host "Nederlandse chat met $model" -ForegroundColor Cyan
-Write-Host "Typ je vraag (Enter). Stoppen: typ 'exit'." -ForegroundColor DarkGray
+Write-Host "Chat with $model" -ForegroundColor Cyan
+Write-Host "Type your question (Enter). To stop, type 'exit'." -ForegroundColor DarkGray
 Write-Host ""
 
 $history = New-Object System.Collections.ArrayList
@@ -25,7 +25,7 @@ $history = New-Object System.Collections.ArrayList
 
 while ($true) {
     Write-Host ""
-    Write-Host -NoNewline "Jij: " -ForegroundColor Green
+    Write-Host -NoNewline "You: " -ForegroundColor Green
     $question = Read-Host
     if ([string]::IsNullOrWhiteSpace($question)) { continue }
     if ($question -match '^\s*(exit|quit|stop|afsluiten|weg)\s*$') { break }
@@ -58,7 +58,7 @@ while ($true) {
     Write-Host -NoNewline "`r"
 
     if ($job.State -eq "Failed" -or $job.State -eq "Stopped") {
-        Write-Host "Fout bij het ophalen van het antwoord." -ForegroundColor Red
+        Write-Host "Failed to retrieve the response." -ForegroundColor Red
         $reason = $job.ChildJobs[0].JobStateInfo.Reason
         if ($reason) { Write-Host $reason.Message -ForegroundColor DarkRed }
         Remove-Job $job -Force
@@ -72,7 +72,7 @@ while ($true) {
         $response = $raw | ConvertFrom-Json
         $answer = $response.choices[0].message.content
     } catch {
-        Write-Host "Onverwacht antwoord van de server ontvangen." -ForegroundColor Red
+        Write-Host "Received an unexpected server response." -ForegroundColor Red
         continue
     }
 

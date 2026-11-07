@@ -366,10 +366,10 @@ impl App {
                 903,
                 [
                     "Chat",
-                    "Services en logs",
-                    "Configuratie",
-                    "Back-up en herstel",
-                    "Modellen downloaden",
+                    "Services and logs",
+                    "Configuration",
+                    "Backup and restore",
+                    "Download models",
                 ][self.page as usize],
             );
             theme::invalidate(self.hwnd);
@@ -384,7 +384,7 @@ impl App {
                         self.controls[&101],
                         0x180,
                         0,
-                        wide(chat["title"].as_str().unwrap_or("Gesprek")).as_ptr() as isize,
+                        wide(chat["title"].as_str().unwrap_or("Conversation")).as_ptr() as isize,
                     );
                     if self.active.as_deref() == chat["id"].as_str() {
                         SendMessageW(self.controls[&101], 0x186, i, 0);
@@ -412,7 +412,7 @@ impl App {
                 }
             }
         } else {
-            text="Welkom bij AI USB\r\n\r\nDit is de native Rust-chat. Start het gekozen model en stel je vraag.\r\nVoor GLM-OCR: voeg een afbeelding toe en vraag om tekstherkenning.".into();
+            text="Welcome to AI USB\r\n\r\nThis is the native Rust chat. Start the selected model and ask your question.\r\nFor GLM-OCR: attach an image and request text recognition.".into();
         }
         self.set(102, &text);
         self.scroll.set(i32::MAX);
@@ -420,12 +420,12 @@ impl App {
     }
     fn begin(&mut self) -> bool {
         if self.busy {
-            self.status("Wacht tot de huidige actie klaar is, of pauzeer de download.");
+            self.status("Wait for the current action to finish, or pause the download.");
             return false;
         }
         self.busy = true;
         self.cancel.store(false, Ordering::Relaxed);
-        self.status("Bezig...");
+        self.status("Working...");
         unsafe {
             EnableWindow(self.controls[&105], 0);
         }
@@ -453,7 +453,7 @@ impl App {
     }
     fn send(&mut self) -> Result<()> {
         if self.busy {
-            return Err("Er loopt al een actie".into());
+            return Err("An action is already running".into());
         }
         self.cfg = core::config(&self.root)?;
         let key = self.model().to_string();
@@ -462,25 +462,25 @@ impl App {
             return Ok(());
         }
         if !core::online(&self.cfg, &key) {
-            return Err("Model is offline of laadt nog. Klik op Model starten en probeer het daarna opnieuw.".into());
+            return Err("Model is offline or still loading. Click Start model and try again.".into());
         }
         if key == "glm-ocr" && self.attachment.is_none() {
-            return Err("GLM-OCR heeft een afbeelding nodig. Klik op Afbeelding.".into());
+            return Err("GLM-OCR requires an image. Click Image.".into());
         }
         let mut next = self.state.clone();
         let active = self.active.clone().unwrap_or_else(core::id);
-        let chats = next["chats"].as_array_mut().ok_or("Ongeldige chatopslag")?;
+        let chats = next["chats"].as_array_mut().ok_or("Invalid chat storage")?;
         if !chats.iter().any(|c| c["id"] == active) {
             chats.insert(0,json!({"id":active,"title":input.chars().take(50).collect::<String>(),"model":key,"createdAt":SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64,"messages":[]}));
         }
         let chat = chats.iter_mut().find(|c| c["id"] == active).unwrap();
         chat["messages"]
             .as_array_mut()
-            .ok_or("Ongeldige berichten")?
+            .ok_or("Invalid messages")?
             .push(json!({"id":core::id(),"role":"user","content":input}));
         let mut messages = vec![];
         if key == "qwen3" {
-            messages.push(json!({"role":"system","content":"Je bent een behulpzame assistent. Antwoord in het Nederlands, zonder emoji's."}));
+            messages.push(json!({"role":"system","content":"You are a helpful assistant. Respond in English by default, without emojis."}));
             for m in chat["messages"]
                 .as_array()
                 .unwrap()
@@ -493,7 +493,7 @@ impl App {
             use base64::Engine;
             let file = self.attachment.as_ref().unwrap();
             if std::fs::metadata(file).map_err(err)?.len() > 20_000_000 {
-                return Err("Afbeelding maximaal 20 MB".into());
+                return Err("Images must be no larger than 20 MB".into());
             }
             let bytes = std::fs::read(file).map_err(err)?;
             let mime = if bytes.starts_with(b"\x89PNG") {
@@ -501,7 +501,7 @@ impl App {
             } else if bytes.starts_with(b"\xff\xd8") {
                 "image/jpeg"
             } else {
-                return Err("Kies een PNG- of JPEG-afbeelding".into());
+                return Err("Choose a PNG or JPEG image".into());
             };
             messages.push(json!({"role":"user","content":[{"type":"text","text":"Text Recognition:"},{"type":"image_url","image_url":{"url":format!("data:{mime};base64,{}",base64::engine::general_purpose::STANDARD.encode(bytes))}}]}));
         }
@@ -529,7 +529,7 @@ impl App {
                 if core::online(&self.cfg, key) {
                     "Bereikbaar"
                 } else {
-                    "Offline / laden"
+                    "Offline / loading"
                 }
             ));
         }
@@ -555,7 +555,7 @@ impl App {
             return Ok(());
         }
         if self.busy && ![505, 101].contains(&id) {
-            return Err("Wacht tot de huidige actie klaar is".into());
+            return Err("Wait for the current action to finish".into());
         }
         match id {
             101 if notification == 1 => unsafe {
@@ -580,7 +580,7 @@ impl App {
                     .and_then(|m| m["content"].as_str())
                 {
                     theme::copy(self.hwnd, answer)?;
-                    self.status("Antwoord gekopieerd");
+                    self.status("Response copied");
                 }
             }
             106 => {
@@ -588,20 +588,20 @@ impl App {
                 self.attachment = None;
                 self.set(103, "");
                 self.render();
-                self.status("Nieuw gesprek");
+                self.status("New conversation");
             }
             107 => {
                 self.reload()?;
-                self.status("Gesprekken herladen");
+                self.status("Reload conversations");
             }
             108 => {
-                self.attachment = file_dialog(self.hwnd, "Afbeeldingen\0*.png;*.jpg;*.jpeg\0\0");
+                self.attachment = file_dialog(self.hwnd, "Images\0*.png;*.jpg;*.jpeg\0\0");
                 self.status(&format!(
-                    "Afbeelding: {}",
+                    "Image: {}",
                     self.attachment
                         .as_ref()
                         .map(|p| p.display().to_string())
-                        .unwrap_or("geen".into())
+                        .unwrap_or("none".into())
                 ));
             }
             109 => {
@@ -611,7 +611,7 @@ impl App {
             }
             110 => {
                 if let Some(active) = &self.active {
-                    if confirm(self.hwnd, "Dit gesprek verwijderen?") {
+                    if confirm(self.hwnd, "Delete this conversation?") {
                         let mut next = self.state.clone();
                         next["chats"]
                             .as_array_mut()
@@ -659,7 +659,7 @@ impl App {
                 let current =
                     std::fs::read_to_string(self.root.join("config/settings.json")).map_err(err)?;
                 if current != self.config_text {
-                    return Err("Configuratie is elders gewijzigd. Klik op Opnieuw laden.".into());
+                    return Err("Configuration changed elsewhere. Click Reload.".into());
                 }
                 let text = self.text(301);
                 let cfg: Value = serde_json::from_str(&text).map_err(err)?;
@@ -670,7 +670,7 @@ impl App {
                 self.config_text =
                     std::fs::read_to_string(self.root.join("config/settings.json")).map_err(err)?;
                 self.set(301, &self.config_text);
-                self.status("Opgeslagen. Herstart betrokken services.");
+                self.status("Saved. Restart the affected services.");
             }
             303 => {
                 self.config_text =
@@ -683,7 +683,7 @@ impl App {
             }
             402 => {
                 if let Some(file) = file_dialog(self.hwnd, "AI USB back-up\0*.zip\0\0") {
-                    if confirm(self.hwnd,"Gesprekken en instellingen herstellen? Sluit browserchats eerst. De huidige gegevens worden geback-upt."){let cfg=core::config(&self.root)?;let root=self.root.clone();self.work(move||core::restore(&cfg,&root,&file));}
+                    if confirm(self.hwnd,"Restore conversations and settings? Close browser chats first. Current data will be backed up."){let cfg=core::config(&self.root)?;let root=self.root.clone();self.work(move||core::restore(&cfg,&root,&file));}
                 }
             }
             403 => {
@@ -731,7 +731,7 @@ impl App {
                     let failed = result.is_err();
                     let content = match result {
                         Ok(s) => s,
-                        Err(e) => format!("Fout: {e}"),
+                        Err(e) => format!("Error: {e}"),
                     };
                     let mut next = self.state.clone();
                     if let Some(chat) = next["chats"]
@@ -745,9 +745,9 @@ impl App {
                             self.state = next;
                             self.render();
                             self.status(if failed {
-                                "Modelaanvraag mislukt; zie gesprek"
+                                "Model request failed; see conversation"
                             } else {
-                                "Antwoord opgeslagen"
+                                "Response saved"
                             });
                         }
                         Err(e) => {
@@ -808,7 +808,7 @@ unsafe extern "system" fn proc(hwnd: H, msg: u32, w: usize, l: isize) -> isize {
             }
             0x10 => {
                 if app.busy {
-                    error("Wacht op het antwoord of pauzeer de download voordat je afsluit.");
+                    error("Wait for the response or pause the download before closing.");
                     return 0;
                 }
             }
@@ -883,10 +883,10 @@ fn create(root: PathBuf, smoke: bool) -> Result<()> {
         });
         for (i, label) in [
             "Chat",
-            "Services en logs",
-            "Configuratie",
-            "Back-up / herstel",
-            "Modeldownloads",
+            "Services and logs",
+            "Configuration",
+            "Backup / restore",
+            "Model downloads",
         ]
         .iter()
         .enumerate()
@@ -897,11 +897,11 @@ fn create(root: PathBuf, smoke: bool) -> Result<()> {
             900,
             -1,
             "STATIC",
-            "Gereed - native Rust; chat gebruikt geen Python-proxy",
+            "Ready - native Rust; chat uses no Python proxy",
             0,
         );
         app.control(901, -1, "STATIC", "AI USB", 0);
-        app.control(902, 0, "STATIC", "GESPREKKEN", 0);
+        app.control(902, 0, "STATIC", "CONVERSATIONS", 0);
         app.control(903, -1, "STATIC", "Chat", 0);
         SendMessageW(app.controls[&901], 0x30, theme::font(22) as usize, 1);
         SendMessageW(app.controls[&903], 0x30, theme::font(22) as usize, 1);
@@ -911,15 +911,15 @@ fn create(root: PathBuf, smoke: bool) -> Result<()> {
         app.control(102, 0, "AIUSBChatView", "", 0);
         app.control(103, 0, "EDIT", "", edit);
         app.control(104, 0, "COMBOBOX", "", 3 | 0x200 | 0x00200000);
-        app.combo(104, &["Qwen3 - Chat", "GLM-OCR - Afbeelding"]);
+        app.combo(104, &["Qwen3 - Chat", "GLM-OCR - Image"]);
         for (id, text) in [
-            (105, "Versturen"),
-            (106, "+  Nieuw gesprek"),
-            (107, "Herladen"),
-            (108, "Afbeelding..."),
-            (109, "Model starten"),
-            (110, "Verwijderen"),
-            (111, "Kopieer antwoord"),
+            (105, "Send"),
+            (106, "+  New conversation"),
+            (107, "Reload"),
+            (108, "Image..."),
+            (109, "Start model"),
+            (110, "Delete"),
+            (111, "Copy answer"),
         ] {
             app.control(id, 0, "BUTTON", text, 0);
         }
@@ -935,42 +935,42 @@ fn create(root: PathBuf, smoke: bool) -> Result<()> {
         for (id, text) in [
             (203, "Start"),
             (204, "Stop"),
-            (205, "Start AI-modellen"),
-            (206, "Stop modellen"),
-            (207, "Status vernieuwen"),
-            (214, "Log bekijken"),
+            (205, "Start AI models"),
+            (206, "Stop models"),
+            (207, "Refresh status"),
+            (214, "View log"),
         ] {
             app.control(id, 1, "BUTTON", text, 0);
         }
         app.control(215, 1, "EDIT", "", edit | 0x800);
         app.control(301, 2, "EDIT", "", edit | 0x00100000);
         app.set(301, &app.config_text);
-        app.control(302, 2, "BUTTON", "Valideren en opslaan", 0);
-        app.control(303, 2, "BUTTON", "Opnieuw laden", 0);
-        app.control(400,3,"STATIC","Back-ups bevatten gesprekken en instellingen, geen modelgewichten.\r\nGesprekken staan in data/chats.json en zijn gedeeld met de webinterface.\r\nSluit browserchats voor herstel. Klik na herstel op Chat > Herladen.\r\nDe huidige gegevens worden voor herstel automatisch geback-upt.",0);
+        app.control(302, 2, "BUTTON", "Validate and save", 0);
+        app.control(303, 2, "BUTTON", "Reload", 0);
+        app.control(400,3,"STATIC","Backups contain conversations and settings, not model weights.\r\nConversations are stored in data/chats.json and shared with the web interface.\r\nClose browser chats before restoring. After restoring, click Chat > Reload.\r\nCurrent data is automatically backed up before restoring.",0);
         for (id, text) in [
-            (401, "Back-up maken"),
-            (402, "Back-up herstellen..."),
-            (403, "Back-upmap openen"),
+            (401, "Create backup"),
+            (402, "Restore backup..."),
+            (403, "Open backup folder"),
         ] {
             app.control(id, 3, "BUTTON", text, 0);
         }
         for (id, label) in [
-            (510, "Directe HTTPS-download-URL"),
-            (511, "Bestandsnaam (.gguf, zonder mappen)"),
-            (512, "Verwachte SHA-256 van de uitgever"),
+            (510, "Direct HTTPS download URL"),
+            (511, "Filename (.gguf, without folders)"),
+            (512, "Expected publisher SHA-256"),
         ] {
             app.control(id, 4, "STATIC", label, 0);
             app.control(id - 9, 4, "EDIT", "", 0x00800000 | 0x80);
         }
         for (id, text) in [
-            (504, "Downloaden / hervatten"),
-            (505, "Pauzeren"),
-            (506, "Modelmap openen"),
+            (504, "Download / resume"),
+            (505, "Pause"),
+            (506, "Open model folder"),
         ] {
             app.control(id, 4, "BUTTON", text, 0);
         }
-        app.control(513,4,"STATIC","Voortgang verschijnt onderaan. Een download wordt pas na SHA-256-controle een .gguf.\r\nGebruik dezelfde URL, bestandsnaam en hash om te hervatten.\r\nSelecteer het nieuwe bestand daarna bij --model / --mmproj in Configuratie.",0);
+        app.control(513,4,"STATIC","Progress appears below. A download becomes a .gguf file only after SHA-256 verification.\r\nUse the same URL, filename, and hash to resume.\r\nThen select the new file under --model / --mmproj in Configuration.",0);
         app.active = app.state["chats"]
             .as_array()
             .and_then(|a| a.first())

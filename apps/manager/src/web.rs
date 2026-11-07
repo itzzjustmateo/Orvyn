@@ -34,12 +34,12 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
     let started=Instant::now();
     let startup=Arc::new(crate::diagnostics::Startup::new());
     let cfg = core::config(&root)?;
-    startup.mark("configuration","Configuratie lezen");
+    startup.mark("configuration","Reading configuration");
     let runtime=crate::models::Runtime::with_config(root.clone(),&cfg)?;
-    startup.mark("runtime","Modelbeheer voorbereiden");
+    startup.mark("runtime","Preparing model manager");
     let assets = core::path(&cfg, "web_ui");
     if !assets.join("index.html").exists() {
-        return Err("De gebundelde webinterface ontbreekt (apps/web-ui/dist).".into());
+        return Err("The bundled web interface is missing (apps/web-ui/dist).".into());
     }
     let server = Server::http("127.0.0.1:0").map_err(err)?;
     let base = format!("http://{}", server.server_addr());
@@ -49,7 +49,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
         &session,
         &json!({"url":base,"token":token,"ui_loaded":false}),
     )?;
-    startup.mark("server","Lokale verbinding voorbereiden");
+    startup.mark("server","Preparing local connection");
     let lock = Arc::new(Mutex::new(()));
     let server_root = root.clone();
     let server_cfg=Arc::new(cfg.clone());
@@ -74,7 +74,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
                         .any(|h| h.field.equiv("X-AIUSB-Session") && h.value.as_str() == token)
                     {
                         let _ = request
-                            .respond(json_response(json!({"error":"Ongeldige sessie"}), 403));
+                            .respond(json_response(json!({"error":"Invalid session"}), 403));
                         return;
                     }
                     if url=="/api/chat-stream"&&request.method().as_str()=="POST"{
@@ -156,7 +156,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
                             if url=="/api/models/store"{return Ok((runtime.store_search(&data)?,200));}
                             if url=="/api/models/import"{let id=runtime.import_model(&data)?;return Ok((json!({"id":id}),202));}
                             if url=="/api/models/clear-selection"{let slot=data["slot"].as_str().unwrap_or("model");if ["model","projector"].contains(&slot){runtime.select_file(slot,None);}return Ok((json!({"ok":true}),200));}
-                            if url=="/api/models/download"{runtime.enqueue(data["id"].as_str().ok_or("Model-id ontbreekt")?)?;return Ok((json!({"ok":true}),202));}
+                            if url=="/api/models/download"{runtime.enqueue(data["id"].as_str().ok_or("Model ID is missing")?)?;return Ok((json!({"ok":true}),202));}
                             if url=="/api/models/queue"{runtime.edit_queue(&data)?;return Ok((json!({"ok":true}),200));}
                             if url=="/api/models/pause"{runtime.pause_download();return Ok((json!({"ok":true}),200));}
                             if url=="/api/models/unload"{return Ok((json!({"message":runtime.unload()?}),200));}
@@ -167,7 +167,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
                                 a.iter()
                                     .all(|v| v["id"].is_string() && v["messages"].is_array())
                             }) {
-                                return Ok((json!({"error":"Ongeldige gesprekken"}), 400));
+                                return Ok((json!({"error":"Invalid conversations"}), 400));
                             }
                             let _guard = lock.lock().map_err(err)?;
                             match core::save_chats(&cfg, &mut data) {
@@ -180,7 +180,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
                             let requested=data["model"].as_str().unwrap_or("").to_string();
                             if requested.starts_with("api-"){return Ok((runtime.chat(&requested,data)?,200));}
                             let name = requested.to_lowercase();
-                            let key=cfg["services"].as_object().unwrap().iter().find(|(key,s)|key.to_lowercase()==name||s["name"].as_str().unwrap_or("").to_lowercase()==name).map(|(key,_)|key.clone()).ok_or("Dit model is niet beschikbaar")?;
+                            let key=cfg["services"].as_object().unwrap().iter().find(|(key,s)|key.to_lowercase()==name||s["name"].as_str().unwrap_or("").to_lowercase()==name).map(|(key,_)|key.clone()).ok_or("This model is unavailable")?;
                             let response = runtime.chat(&key, data)?;
                             return Ok((response, 200));
                         }
@@ -233,7 +233,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
         .build(&event_loop)
         .map_err(err)?;
     let window_ms=started.elapsed().as_millis();
-    startup.mark("window","Appvenster maken");
+    startup.mark("window","Creating application window");
     // Profile and browser cache belong to the USB, not AppData on C:.
     let profile = core::path(&cfg, "data").join("webview-profile");
     fs::create_dir_all(&profile).map_err(err)?;
@@ -270,7 +270,7 @@ pub fn run(root: PathBuf, smoke: bool) -> Result<()> {
                 }
             }
         }).build(&window).map_err(err)?;
-    startup.mark("webview","WebView voorbereiden");
+    startup.mark("webview","Preparing WebView");
     let deadline = Instant::now() + Duration::from_secs(10);
     event_loop.run(move |event, _, flow| {
         *flow = if smoke {

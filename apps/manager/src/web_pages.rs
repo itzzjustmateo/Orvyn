@@ -9,13 +9,13 @@ fn public(ip:Ipv4Addr)->bool{
 pub fn validate(raw:&str)->Result<Url>{
  if raw.len()>4000{return Err("Webadres te lang".into());}
  let mut url=Url::parse(raw).map_err(err)?;
- if url.scheme()!="https"||!url.username().is_empty()||url.password().is_some()||url.port_or_known_default()!=Some(443){return Err("Gebruik een openbare HTTPS-link zonder inloggegevens.".into());}
+ if url.scheme()!="https"||!url.username().is_empty()||url.password().is_some()||url.port_or_known_default()!=Some(443){return Err("Use a public HTTPS link without credentials.".into());}
  url.set_fragment(None);
- if url.host_str().is_none(){return Err("Host ontbreekt".into());}
+ if url.host_str().is_none(){return Err("Host is missing".into());}
  Ok(url)
 }
 fn address(url:&Url)->Result<Ipv4Addr>{
- (url.host_str().unwrap(),443).to_socket_addrs().map_err(err)?.filter_map(|s|match s.ip(){std::net::IpAddr::V4(ip) if public(ip)=>Some(ip),_=>None}).next().ok_or("Deze website heeft geen toegestaan openbaar IPv4-adres.".into())
+ (url.host_str().unwrap(),443).to_socket_addrs().map_err(err)?.filter_map(|s|match s.ip(){std::net::IpAddr::V4(ip) if public(ip)=>Some(ip),_=>None}).next().ok_or("This website has no permitted public IPv4 address.".into())
 }
 fn decode(s:&str)->String{
  let mut out=String::new();let mut rest=s;
@@ -51,7 +51,7 @@ fn extract(html:&str)->String{
 type Cache=Vec<(String,Instant,Value)>;
 pub fn read(root:&Path,data:&Value)->Result<Value>{
  static CACHE:OnceLock<Mutex<Cache>>=OnceLock::new();
- let mut url=validate(data["url"].as_str().ok_or("Webadres ontbreekt")?)?;
+ let mut url=validate(data["url"].as_str().ok_or("Web address is missing")?)?;
  let key=url.to_string();let cache=CACHE.get_or_init(||Mutex::new(vec![]));
  if let Some((_,_,value))=cache.lock().map_err(err)?.iter().find(|(u,t,_)|*u==key&&t.elapsed()<Duration::from_secs(300)){return Ok(value.clone());}
  let temp=root.join("tools/temp");fs::create_dir_all(&temp).map_err(err)?;
@@ -60,18 +60,18 @@ pub fn read(root:&Path,data:&Value)->Result<Value>{
   for _ in 0..4 {
    let ip=address(&url)?;let pinned=format!("{}:443:{ip}",url.host_str().unwrap());
    let output=core::hidden("curl.exe").args(["--silent","--show-error","--noproxy","*","--proto","=https","--connect-timeout","5","--max-time","15","--max-filesize","2000000","--resolve",&pinned,"-A","Orvyn/1 (web page reader)","-D"]).arg(&headers).arg("-o").arg(&body).args(["-w","%{http_code}","--url",url.as_str()]).output().map_err(err)?;
-   if !output.status.success(){return Err("Website kon niet worden gelezen (netwerk, tijdslimiet of pagina te groot).".into());}
+   if !output.status.success(){return Err("Website could not be read (network error, timeout, or page too large).".into());}
    let status=String::from_utf8_lossy(&output.stdout).trim().parse::<u16>().map_err(err)?;
    let head=fs::read_to_string(&headers).map_err(err)?;
    let header=|name:&str|head.lines().filter_map(|line|line.split_once(':')).filter(|(k,_)|k.eq_ignore_ascii_case(name)).last().map(|(_,v)|v.trim().to_string());
    if (300..400).contains(&status){url=validate(url.join(&header("location").ok_or("Redirect zonder locatie")?).map_err(err)?.as_str())?;continue;}
-   if status!=200{return Err(format!("Website antwoordde met HTTP {status}. Inloggen en blokkades worden niet omzeild."));}
+   if status!=200{return Err(format!("Website returned HTTP {status}. Sign-in requirements and access restrictions are not bypassed."));}
    let mime=header("content-type").unwrap_or_default().to_lowercase();
-   if !mime.starts_with("text/html")&&!mime.starts_with("text/plain")&&!mime.starts_with("application/xhtml+xml"){return Err("Alleen HTML- en tekstpagina's worden ondersteund.".into());}
-   let bytes=fs::read(&body).map_err(err)?;if bytes.len()>2_000_000{return Err("Pagina te groot".into());}
+   if !mime.starts_with("text/html")&&!mime.starts_with("text/plain")&&!mime.starts_with("application/xhtml+xml"){return Err("Only HTML and text pages are supported.".into());}
+   let bytes=fs::read(&body).map_err(err)?;if bytes.len()>2_000_000{return Err("Page te groot".into());}
    let html=String::from_utf8_lossy(&bytes);
    let text=if mime.starts_with("text/plain"){html.chars().take(12000).collect::<String>()}else{extract(&html)};
-   if text.trim().len()<30{return Err("Geen bruikbare paginatekst. De pagina vereist mogelijk JavaScript of inloggen.".into());}
+   if text.trim().len()<30{return Err("No usable page text. The page may require JavaScript or sign-in.".into());}
    return Ok(json!({"name":url.host_str().unwrap(),"url":url.as_str(),"text":text}));
   }
   Err("Te veel doorverwijzingen".into())

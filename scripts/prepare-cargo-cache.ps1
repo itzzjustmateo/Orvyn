@@ -1,6 +1,9 @@
 # Cargo tar timestamps can fail on exFAT. Verify archives and unpack without timestamps.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'usb-environment.ps1')
+# Cargo must populate the registry index as well as crate archives for offline resolution.
+& cargo.exe fetch --manifest-path (Join-Path $script:UsbRoot 'apps/manager/Cargo.toml') --locked
+if ($LASTEXITCODE -ne 0) { throw 'Locked Cargo dependency fetch failed.' }
 $registry = 'index.crates.io-1949cf8c6b5b557f'
 $cache = Join-Path $env:CARGO_HOME ('registry\cache\' + $registry)
 $sources = Join-Path $env:CARGO_HOME ('registry\src\' + $registry)
@@ -21,13 +24,13 @@ foreach ($block in ($lock -split '\[\[package\]\]')) {
         if (Test-Path -LiteralPath $existing) { Copy-Item -LiteralPath $existing -Destination $archive }
         else {
             & curl.exe --silent --show-error --fail --location --output $archive "https://static.crates.io/crates/$name/$filename"
-            if ($LASTEXITCODE -ne 0) { throw "Download mislukt: $name" }
+            if ($LASTEXITCODE -ne 0) { throw "Download failed: $name" }
         }
     }
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLower() -ne $checksum) { throw "Checksum mislukt: $name" }
+    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLower() -ne $checksum) { throw "Checksum failed: $name" }
     & tar.exe -xmzf $archive -C $sources
-    if ($LASTEXITCODE -ne 0) { throw "Uitpakken mislukt: $name" }
+    if ($LASTEXITCODE -ne 0) { throw "Extraction failed: $name" }
     [IO.File]::WriteAllText((Join-Path $target '.cargo-ok'),'{"v":1}')
     $count++
 }
-"Cargo-cache voorbereid op USB: $count packages"
+"Project Cargo cache prepared: $count packages"

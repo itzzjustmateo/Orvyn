@@ -272,7 +272,7 @@ export function PromptInput({
                   </span>
                 ) : null}
                 <span className="truncate text-muted-foreground">
-                  {currentModel?.label ?? "Kies een model"}
+                  {currentModel?.label ?? "Choose a model"}
                 </span>
               </span>
             </SelectTrigger>

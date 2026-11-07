@@ -38,7 +38,7 @@ pub fn root() -> Result<PathBuf> {
     exe.ancestors()
         .find(|p| p.join("config/settings.json").is_file())
         .map(Path::to_path_buf)
-        .ok_or("config/settings.json ontbreekt".into())
+        .ok_or("config/settings.json is missing".into())
 }
 pub fn read_json(path: &Path) -> Result<Value> {
     serde_json::from_slice(&fs::read(path).map_err(err)?).map_err(err)
@@ -124,26 +124,26 @@ pub fn path(cfg: &Value, key: &str) -> PathBuf {
 }
 pub fn validate(cfg: &Value) -> Result<()> {
     let mut ports = std::collections::HashSet::new();
-    let services = cfg["services"].as_object().ok_or("services ontbreekt")?;
+    let services = cfg["services"].as_object().ok_or("services is missing")?;
     for (key, s) in services {
         if key.is_empty() || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
-            return Err("Ongeldige service-id".into());
+            return Err("Invalid service ID".into());
         }
-        let port = s["port"].as_u64().ok_or("Poort moet een getal zijn")?;
+        let port = s["port"].as_u64().ok_or("Port must be a number")?;
         if port == 0 || port > 65535 || !ports.insert(port) {
-            return Err("Poorten moeten uniek zijn (1-65535)".into());
+            return Err("Ports must be unique (1-65535)".into());
         }
         if s["command"].as_str().is_none()
             || !s["args"]
                 .as_array()
                 .is_some_and(|a| a.iter().all(Value::is_string))
         {
-            return Err("Ongeldig servicecommando".into());
+            return Err("Invalid service command".into());
         }
     }
     for key in ["data", "logs", "models", "backups"] {
         if path(cfg, key).as_os_str().is_empty() {
-            return Err(format!("Pad {key} ontbreekt"));
+            return Err(format!("Path {key} is missing"));
         }
     }
     Ok(())
@@ -193,7 +193,7 @@ impl Lock {
             let status = WaitForSingleObject(h, 5000);
             if status != 0 && status != 0x80 {
                 CloseHandle(h);
-                return Err("Een andere actie is nog bezig".into());
+                return Err("Another action is still running".into());
             }
             Ok(Self(h))
         }
@@ -215,7 +215,7 @@ pub fn atomic_transient(path: &Path, value: &Value) -> Result<()> {
     atomic_write(path, value, false)
 }
 fn atomic_write(path: &Path, value: &Value, durable: bool) -> Result<()> {
-    fs::create_dir_all(path.parent().ok_or("Geen bovenliggende map")?).map_err(err)?;
+    fs::create_dir_all(path.parent().ok_or("No parent folder")?).map_err(err)?;
     let temp = path.with_extension(format!("{}.tmp", id()));
     let result = (|| {
         let mut f = File::create(&temp).map_err(err)?;
@@ -295,21 +295,21 @@ pub fn service(root: &Path, key: &str, start: bool) -> Result<String> {
                 return Err(String::from_utf8_lossy(&output.stderr).into());
             }
             let _ = fs::remove_file(pidfile);
-            return Ok(format!("{key} gestopt"));
+            return Ok(format!("{key} stopped"));
         }
         return if online(&cfg, key) {
             Err(format!(
-                "{key} draait buiten deze Rust-manager; sluit het oorspronkelijke proces eerst af"
+                "{key} is running outside this Rust manager; close the original process first"
             ))
         } else {
-            Ok(format!("{key} is gestopt"))
+            Ok(format!("{key} has stopped"))
         };
     }
     if online(&cfg,key) && owned.is_none() {
-        return Err(format!("Poort voor {key} wordt door een ander proces gebruikt"));
+        return Err(format!("Port for {key} is used by another process"));
     }
     if owned.is_some() {
-        return Ok(format!("{key} draait of laadt al"));
+        return Ok(format!("{key} is already running or loading"));
     }
     let mut args: Vec<String> = svc["args"]
         .as_array()
@@ -351,14 +351,14 @@ pub fn service(root: &Path, key: &str, start: bool) -> Result<String> {
         .map_err(err)?;
     std::thread::sleep(Duration::from_millis(200));
     if let Some(code) = child.try_wait().map_err(err)? {
-        return Err(format!("{key} stopte ({code}); bekijk het log"));
+        return Err(format!("{key} stopped ({code}); check the log"));
     }
     let pid = child.id();
     atomic(
         &pidfile,
-        &json!({"pid":pid,"created": identity(pid).ok_or("Proces stopte tijdens starten")?}),
+        &json!({"pid":pid,"created": identity(pid).ok_or("Process stopped during startup")?}),
     )?;
-    Ok(format!("{key} gestart; model kan nog laden"))
+    Ok(format!("{key} started; the model may still be loading"))
 }
 pub fn load_chats(cfg: &Value) -> Result<Value> {
     let file = path(cfg, "data").join("chats.json");
@@ -373,7 +373,7 @@ pub fn save_chats(cfg: &Value, state: &mut Value) -> Result<()> {
     let disk = load_chats(cfg)?;
     if disk["revision"] != state["revision"] {
         return Err(
-            "Gesprekken zijn elders gewijzigd. Klik op Herladen voordat je doorgaat.".into(),
+            "Conversations changed elsewhere. Click Reload before continuing.".into(),
         );
     }
     state["revision"] = Value::String(id());
@@ -390,10 +390,10 @@ pub fn chat(cfg: &Value, key: &str, messages: Value) -> Result<String> {
         .unwrap_or("")
         .trim();
     if text.is_empty() {
-        return Err("Het model gaf geen eindantwoord binnen het tokenbudget.".into());
+        return Err("The model did not produce a final answer within the token budget.".into());
     }
     if text.contains("@@@@@@") || text.contains('\u{001f}') || text.contains("<|im_start|>") {
-        return Err("Ongeldige modeluitvoer; controleer de instellingen.".into());
+        return Err("Invalid model output; check the settings.".into());
     }
     Ok(text.into())
 }
@@ -425,13 +425,13 @@ pub fn chat_response(cfg: &Value, key: &str, mut body: Value) -> Result<Value> {
     child
         .stdin
         .take()
-        .ok_or("Geen invoerpipe")?
+        .ok_or("No input pipe")?
         .write_all(body.to_string().as_bytes())
         .map_err(err)?;
     let output = child.wait_with_output().map_err(err)?;
     if !output.status.success() {
         return Err(format!(
-            "Modelaanvraag mislukt: {} {}",
+            "Model request failed: {} {}",
             String::from_utf8_lossy(&output.stderr),
             String::from_utf8_lossy(&output.stdout)
         ));
@@ -444,10 +444,10 @@ pub fn stream_response(cfg:&Value,key:&str,mut body:Value,mut emit:impl FnMut(St
     body["stream"]=json!(true);body["stream_options"]=json!({"include_usage":true});
     let port=cfg["services"][key]["port"].as_u64().ok_or("Onbekend model")?;
     let mut child=hidden("curl.exe").args(["-sS","-N","--fail-with-body","--max-time","300","--noproxy","*","-H","Content-Type: application/json","--data-binary","@-",&format!("http://127.0.0.1:{port}/v1/chat/completions")]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(err)?;
-    child.stdin.take().ok_or("Invoer ontbreekt")?.write_all(body.to_string().as_bytes()).map_err(err)?;
+    child.stdin.take().ok_or("Input is missing")?.write_all(body.to_string().as_bytes()).map_err(err)?;
     let mut content=String::new();let mut usage=Value::Null;let mut complete=false;
     let result=(||->Result<()>{
-        for line in BufReader::new(child.stdout.take().ok_or("Uitvoer ontbreekt")?).lines(){
+        for line in BufReader::new(child.stdout.take().ok_or("Output is missing")?).lines(){
             let line=line.map_err(err)?;let Some(data)=line.strip_prefix("data:")else{continue};let data=data.trim();
             if data=="[DONE]"{complete=true;continue;}
             let chunk:Value=serde_json::from_str(data).map_err(err)?;
@@ -458,7 +458,7 @@ pub fn stream_response(cfg:&Value,key:&str,mut body:Value,mut emit:impl FnMut(St
         }Ok(())
     })();
     if result.is_err(){let _=child.kill();}let status=child.wait().map_err(err)?;result?;
-    if !status.success()||!complete{return Err("Modelstream onderbroken of niet ondersteund door de runtime".into());}
+    if !status.success()||!complete{return Err("Model stream interrupted or unsupported by the runtime".into());}
     Ok(json!({"choices":[{"message":{"content":content}}],"usage":usage}))
 }
 pub fn backup(cfg: &Value) -> Result<PathBuf> {
@@ -517,13 +517,13 @@ pub fn restore(cfg: &Value, root: &Path, file: &Path) -> Result<String> {
     let custom=if has_custom{Some(read("custom-models.json")?)}else{None};
     let store=if has_store{Some(read("store-models.json")?)}else{None};
     if let Some(ref custom)=custom{
-        if !catalog_valid(custom){return Err("Ongeldige eigen-modelcatalogus in back-up".into());}
+        if !catalog_valid(custom){return Err("Invalid custom model catalog in backup".into());}
     }
     if let Some(ref store)=store{
-        if !catalog_valid(store){return Err("Ongeldige modelwinkel-catalogus in back-up".into());}
+        if !catalog_valid(store){return Err("Invalid store model catalog in backup".into());}
     }
     if !state["chats"].is_array() {
-        return Err("Ongeldige gesprekken".into());
+        return Err("Invalid conversations".into());
     }
     let providers=if has_providers{let data=read("api-providers.json")?;crate::providers::validate_config(&data)?;Some(data)}else{None};
     let previous = backup(cfg)?;
@@ -537,7 +537,7 @@ pub fn restore(cfg: &Value, root: &Path, file: &Path) -> Result<String> {
     if let Some(store)=store{atomic(&root.join("config/store-models.json"),&store)?;}
     if let Some(providers)=providers{atomic(&root.join("config/api-providers.json"),&providers)?;}
     Ok(format!(
-        "Hersteld. Vorige versie: {}. Herlaad chats en herstart betrokken services.",
+        "Restored. Previous version: {}. Reload chats and restart affected services.",
         previous.display()
     ))
 }
@@ -554,14 +554,14 @@ pub fn download(
         || expected.len() != 64
         || !expected.bytes().all(|b| b.is_ascii_hexdigit())
     {
-        return Err("HTTPS-URL en SHA-256 van 64 hextekens zijn verplicht".into());
+        return Err("An HTTPS URL and a 64-digit hexadecimal SHA-256 are required".into());
     }
     if !name.ends_with(".gguf")
         || !name
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
     {
-        return Err("Gebruik een .gguf-bestandsnaam zonder mappen".into());
+        return Err("Use a .gguf filename without folders".into());
     }
     let dir = path(cfg, "models");
     fs::create_dir_all(&dir).map_err(err)?;
@@ -573,12 +573,12 @@ pub fn download(
     let meta = dir.join(format!("{name}.download.json"));
     let source = json!({"url":url,"sha256":expected.to_lowercase()});
     if part.exists() && read_json(&meta)? != source {
-        return Err("Gedeeltelijke download hoort bij een andere URL/hash".into());
+        return Err("The partial download belongs to a different URL/hash".into());
     }
     atomic(&meta, &source)?;
     let mut retries=0;
     'transfer: loop {
-    if cancel.load(Ordering::Relaxed) {return Ok("Download gepauzeerd".into());}
+    if cancel.load(Ordering::Relaxed) {return Ok("Download paused".into());}
     let mut child = hidden("curl.exe")
         .args([
             "--silent",
@@ -612,7 +612,7 @@ pub fn download(
         if cancel.load(Ordering::Relaxed) {
             let _ = child.kill();
             let _ = child.wait();
-            return Ok("Gepauzeerd; dezelfde URL/naam/hash hervatten de download".into());
+            return Ok("Paused; use the same URL/name/hash to resume the download".into());
         }
         if let Some(status) = child.try_wait().map_err(err)? {
             let mut http = String::new();
@@ -625,15 +625,15 @@ pub fn download(
                 if retries<3 && (matches!(status.code(),Some(5|6|7|18|28|35|52|55|56|92)) || matches!(http.trim(),"429"|"500"|"502"|"503"|"504")) {
                     retries+=1;
                     report(format!("Verbinding onderbroken. Automatisch hervatten ({retries}/3)…"));
-                    for _ in 0..(20*retries) {if cancel.load(Ordering::Relaxed){return Ok("Download gepauzeerd".into());}std::thread::sleep(Duration::from_millis(100));}
+                    for _ in 0..(20*retries) {if cancel.load(Ordering::Relaxed){return Ok("Download paused".into());}std::thread::sleep(Duration::from_millis(100));}
                     continue 'transfer;
                 }
-                return Err(format!("Download onderbroken ({status}); gedeeltelijk bestand bewaard. Start opnieuw om te hervatten."));
+                return Err(format!("Download interrupted ({status}); partial file preserved. Start again to resume."));
             }
             break 'transfer;
         }
         report(format!(
-            "Gedownload: {:.1} MiB",
+            "Downloaded: {:.1} MiB",
             fs::metadata(&part).map(|m| m.len()).unwrap_or(0) as f64 / 1048576.0
         ));
         std::thread::sleep(Duration::from_millis(500));
@@ -644,7 +644,7 @@ pub fn download(
     let _ = fs::remove_file(meta);
     atomic(&dir.join(format!("{name}.verified.json")), &source)?;
     Ok(format!(
-        "Geverifieerd: {}. Stel --model/--mmproj in bij Configuratie.",
+        "Geverifieerd: {}. Stel --model/--mmproj in bij Configuration.",
         target.display()
     ))
 }
@@ -653,7 +653,7 @@ fn verify_download(part: &Path, target: &Path, expected: &str) -> Result<()> {
     let mut header = [0; 4];
     input.read_exact(&mut header).map_err(err)?;
     if &header != b"GGUF" {
-        return Err("Geen GGUF-bestand; niet geactiveerd".into());
+        return Err("Not a GGUF file; not activated".into());
     }
     let mut digest = Sha256::new();
     digest.update(header);
@@ -719,7 +719,7 @@ mod tests {
         let answer = chat(
             &cfg,
             "qwen3",
-            json!([{"role":"user","content":"Wat is 2+2? Geef alleen het getal."}]),
+            json!([{"role":"user","content":"What is 2+2? Return only the number."}]),
         )
         .unwrap();
         assert_eq!(answer.trim(), "4");

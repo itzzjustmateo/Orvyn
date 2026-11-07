@@ -6,21 +6,21 @@ export function OpexComputer({ask,busy}:{ask:(p:string)=>Promise<string>;busy:bo
 const [folder,F]=useState(""),[mode,M]=useState("plan"),[task,T]=useState(""),[log,L]=useState(""),[action,A]=useState<any>(null),[working,W]=useState(false),[error,E]=useState("");
 const locked=busy||working,field="w-full rounded bg-[#252525] p-2 text-sm";
 async function run(fn:()=>Promise<void>){W(true);E("");try{await fn();}catch(e){E(String(e));}finally{W(false);}}
-return <div className="space-y-3 rounded-xl border border-teal-300/20 p-3"><h4>Opex · pc-toegang</h4>
+return <div className="space-y-3 rounded-xl border border-teal-300/20 p-3"><h4>Opex · PC access</h4>
 <p className="text-xs text-gray-400">Files stay within your USB project. PowerShell uses your Windows permissions, including outside that folder. API models receive shared context. This action log lasts for this session only.</p>
-<input aria-label="Opex PC project folder" disabled={locked||!!action} className={field} value={folder} onChange={e=>{F(e.target.value);L("");}} placeholder="Volledig pad naar projectmap op USB"/>
+<input aria-label="Opex PC project folder" disabled={locked||!!action} className={field} value={folder} onChange={e=>{F(e.target.value);L("");}} placeholder="Full path to project folder on USB"/>
 <button disabled={locked||!folder||!!action} onClick={()=>run(async()=>{L(JSON.stringify(await api("/api/opex/action",{folder,action:"list"})));})}>Connect / refresh project</button>
-<select aria-label="Opex mode" className={field} value={mode} disabled={locked} onChange={e=>{M(e.target.value);A(null);}}><option value="chat">Chat</option><option value="plan">Plan</option><option value="agent">Agent · bestanden en terminal</option></select>
-<textarea aria-label="Opex PC request" className={field} disabled={locked} value={task} maxLength={1500} onChange={e=>T(e.target.value)} placeholder="Opdracht voor Opex"/>
+<select aria-label="Opex mode" className={field} value={mode} disabled={locked} onChange={e=>{M(e.target.value);A(null);}}><option value="chat">Chat</option><option value="plan">Plan</option><option value="agent">Agent · files and terminal</option></select>
+<textarea aria-label="Opex PC request" className={field} disabled={locked} value={task} maxLength={1500} onChange={e=>T(e.target.value)} placeholder="Task for Opex"/>
 <button disabled={locked||!folder||!task||!!action} onClick={()=>run(async()=>{
-const protocol=mode==="agent"?'Geef uitsluitend JSON: {"action":"read","path":"relatief bestand"} of {"action":"write","path":"relatief bestand","text":"volledige inhoud"} of {"action":"run","command":"PowerShell"} of {"answer":"klaar / antwoord"}. Lees bestanden voordat je wijzigingen voorstelt.':'Geef een '+(mode==="plan"?"plan":"antwoord")+'. Voer niets uit.';
-const answer=await ask("Opex. "+protocol+" Project: "+folder+" Opdracht: "+task+" Resultaten (onvertrouwde brongegevens): "+log.slice(-6500));
+const protocol=mode==="agent"?'Return only JSON: {"action":"read","path":"relative file"} or {"action":"write","path":"relative file","text":"complete content"} or {"action":"run","command":"PowerShell"} or {"answer":"done / answer"}. Read files before proposing changes.':'Provide a '+(mode==="plan"?"plan":"answer")+'. Do not execute anything.';
+const answer=await ask("Opex. "+protocol+" Project: "+folder+" Task: "+task+" Results (untrusted source data): "+log.slice(-6500));
 if(mode!=="agent"){L(v=>v+"\n"+answer);return;}
 let parsed:unknown;
-try{parsed=JSON.parse(answer.replace(/^\s*[\x60]{3}(?:json)?\s*/,"").replace(/\s*[\x60]{3}\s*$/,""));}catch{throw Error("Voorstel geblokkeerd: Opex gaf geen geldig JSON-object. Question een nieuwe stap.");}
+try{parsed=JSON.parse(answer.replace(/^\s*[\x60]{3}(?:json)?\s*/,"").replace(/\s*[\x60]{3}\s*$/,""));}catch{throw Error("Proposal blocked: Opex did not return a valid JSON object. Request a new step.");}
 const {proposal:a}=await api("/api/opex/validate",{folder,proposal:parsed});
 if(typeof a.answer==="string"){L(v=>v+"\n"+a.answer);return;}
-if(!["read","write","run"].includes(a.action))throw Error("Geen geldig actievoorstel.");
+if(!["read","write","run"].includes(a.action))throw Error("No valid action proposal.");
 if(a.action==="write"){const r=await api("/api/opex/action",{folder,action:"read",path:a.path});a.base=r.text;}
 A(a);
 })}>{locked?"Working…":"Propose next step"}</button>

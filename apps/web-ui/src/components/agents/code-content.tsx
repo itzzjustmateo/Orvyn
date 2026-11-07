@@ -16,7 +16,7 @@ export function CodeBlock({code,language='text',onCompare}:{code:string;language
     <div className="flex flex-wrap items-center gap-3 border-b border-white/10 px-3 py-2 text-xs"><span className="mr-auto">{language}</span><button onClick={()=>navigator.clipboard.writeText(code).then(()=>setStatus('Copied.')).catch(()=>setStatus('Copy failed.'))}>Copy code</button>{onCompare&&<button onClick={()=>onCompare(code)}>Compare change</button>}{lang==='javascript'&&(running?<button onClick={()=>{stop();setStatus('Stopped.');}}>Stop code</button>:<button onClick={run}>Run JavaScript</button>)}</div>
     <pre className="max-h-96 overflow-auto p-3 whitespace-pre"><code>{tokens?tokens.map((line,i)=><span key={i} className="block min-h-5">{line.map((token,j)=><span key={j} style={{color:token.color}}>{token.content}</span>)}</span>):code}</code></pre>
     {status&&<pre role="status" className="max-h-48 overflow-auto border-t border-white/10 p-3 whitespace-pre-wrap">{status}</pre>}
-    {lang==='javascript'&&<p className="px-3 pb-2 text-xs text-gray-500">QuickJS · 16 MB · 1,5 seconde rekentijd · geen netwerk, bestanden, DOM of imports.</p>}
+    {lang==='javascript'&&<p className="px-3 pb-2 text-xs text-gray-500">QuickJS · 16 MB · 1.5 seconds of execution time · no network, files, DOM, or imports.</p>}
   </section>;
 }
 export function CodeContent({text,onCompare}:{text:string;onCompare?:(text:string)=>void}){

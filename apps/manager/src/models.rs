@@ -21,7 +21,7 @@ pub fn catalog(root:&Path)->Result<Vec<Value>> {
     let mut models=vec![];
     for name in ["model-catalog.json","custom-models.json","store-models.json"]{
         let file=root.join("config").join(name);if !file.exists(){continue;}
-        models.extend(core::read_json(&file)?["models"].as_array().cloned().ok_or("Ongeldige modelcatalogus")?);
+        models.extend(core::read_json(&file)?["models"].as_array().cloned().ok_or("Invalid model catalog")?);
     }
     Ok(models)
 }
@@ -29,15 +29,15 @@ pub fn extend_config(root:&Path,cfg:&mut Value)->Result<()> {
     let runtime=cfg["paths"]["llamafile"].as_str().unwrap_or("").to_string();
     let folder=cfg["paths"]["models"].as_str().unwrap_or("models").to_string();
     for (index,m) in catalog(root)?.iter().enumerate(){
-        let id=m["id"].as_str().ok_or("Model-id ontbreekt")?;
-        let file=m["file"].as_str().ok_or("Modelbestand ontbreekt")?;
-        if !file.ends_with(".gguf")||!file.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){return Err("Ongeldige bestandsnaam in catalogus".into());}
+        let id=m["id"].as_str().ok_or("Model ID is missing")?;
+        let file=m["file"].as_str().ok_or("Model file is missing")?;
+        if !file.ends_with(".gguf")||!file.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){return Err("Invalid filename in catalog".into());}
         if !cfg["services"][id].is_null(){continue;}
         let port=8082+index as u16;
         cfg["services"][id]=json!({"name":m["name"],"category":m["category"],"port":port,"command":runtime,"args":["--server","--model",format!("{folder}/{file}"),"--host","127.0.0.1","--port",port.to_string(),"--ctx-size","4096","--n-predict","4096","--gpu","disable","--nologo"]});
         if m["runtime_profile"]=="single"{cfg["services"][id]["args"].as_array_mut().unwrap().extend([json!("--parallel"),json!("1")]);}
         if let Some(projector)=m["projector"]["file"].as_str(){
-            if !projector.ends_with(".gguf")||!projector.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){return Err("Ongeldige projectorbestandsnaam".into());}
+            if !projector.ends_with(".gguf")||!projector.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-".contains(&b)){return Err("Invalid projector filename".into());}
             cfg["services"][id]["args"].as_array_mut().unwrap().extend([json!("--mmproj"),json!(format!("{folder}/{projector}"))]);
         }
     }
@@ -117,8 +117,8 @@ impl Runtime {
         Ok(())
     }
     pub fn unload(&self)->Result<String>{
-        let _guard=self.inference.try_lock().map_err(|_|"Een antwoord wordt nog gegenereerd")?;
-        self.stop_all()?;let mut state=self.state.lock().map_err(err)?;state.active=None;state.phase="idle".into();Ok("Modellen uitgeladen".into())
+        let _guard=self.inference.try_lock().map_err(|_|"A response is still being generated")?;
+        self.stop_all()?;let mut state=self.state.lock().map_err(err)?;state.active=None;state.phase="idle".into();Ok("Models unloaded".into())
     }
     pub fn list(&self)->Result<Value>{
         let cfg=core::config(&self.root)?;let entries=catalog(&self.root)?;
@@ -129,7 +129,7 @@ impl Runtime {
             let installed=is_installed(&cfg,key,entry);let online=installed&&core::service_owned(&cfg,key)&&core::online(&cfg,key);
             let category=entry.and_then(|m|m["category"].as_str()).unwrap_or(if key=="glm-ocr"{"vision"}else{"reasoning"});
             let status=if state.active.as_ref()==Some(key){state.phase.as_str()}else if online{"loaded"}else if installed{"unloaded"}else{"not_installed"};
-            result[key]=json!({"name":svc["name"],"type":if category=="vision"{"vision"}else{"chat"},"category":category,"description":entry.and_then(|m|m["description"].as_str()).unwrap_or(if key=="glm-ocr"{"Tekstherkenning uit afbeeldingen"}else{"Qwen3 Thinking voor redeneren en Nederlandse chat"}),"installed":installed,"online":online,"status":status,"bytes":entry.and_then(|m|m["bytes"].as_u64()).filter(|b|*b>0).or_else(||model_path(&cfg,key).and_then(|p|fs::metadata(p).ok().map(|m|m.len()))).unwrap_or(0),"custom":entry.is_some_and(|m|m["origin"]=="custom"||m["origin"]=="local"),"store":entry.is_some_and(|m|m["origin"]=="store"),"downloads":entry.and_then(|m|m["downloads"].as_u64()).unwrap_or(0),"can_download":entry.is_some_and(|m|m["url"].is_string()),"tokens_used":state.tokens.get(key).copied().unwrap_or(0),"tokens_limit":2000000});
+            result[key]=json!({"name":svc["name"],"type":if category=="vision"{"vision"}else{"chat"},"category":category,"description":entry.and_then(|m|m["description"].as_str()).unwrap_or(if key=="glm-ocr"{"Tekstherkenning uit afbeeldingen"}else{"Qwen3 Thinking for reasoning and chat"}),"installed":installed,"online":online,"status":status,"bytes":entry.and_then(|m|m["bytes"].as_u64()).filter(|b|*b>0).or_else(||model_path(&cfg,key).and_then(|p|fs::metadata(p).ok().map(|m|m.len()))).unwrap_or(0),"custom":entry.is_some_and(|m|m["origin"]=="custom"||m["origin"]=="local"),"store":entry.is_some_and(|m|m["origin"]=="store"),"downloads":entry.and_then(|m|m["downloads"].as_u64()).unwrap_or(0),"can_download":entry.is_some_and(|m|m["url"].is_string()),"tokens_used":state.tokens.get(key).copied().unwrap_or(0),"tokens_limit":2000000});
             if let Some(bytes)=entry.and_then(|m|m["projector"]["bytes"].as_u64()){result[key]["bytes"]=json!(result[key]["bytes"].as_u64().unwrap_or(0)+bytes);}
         }
         result.as_object_mut().unwrap().extend(self.providers.catalog()?.as_object().unwrap().clone());
@@ -158,12 +158,12 @@ impl Runtime {
         self.chat_with(key,body,|cfg,key,body|core::stream_response(cfg,key,body,&mut emit))
     }
     pub fn chat_with(&self,key:&str,mut body:Value,respond:impl FnOnce(&Value,&str,Value)->Result<Value>)->Result<Value>{
-        let _guard=self.inference.try_lock().map_err(|_|"Er loopt al een modelaanvraag; wacht tot die klaar is")?;
+        let _guard=self.inference.try_lock().map_err(|_|"A model request is already running; wait for it to finish")?;
         if self.closing.load(Ordering::Relaxed){return Err("App sluit af".into());}
         self.cancel_generation.store(false,Ordering::Relaxed);
         let cfg=core::config(&self.root)?;let entries=catalog(&self.root)?;
         let entry=entries.iter().find(|m|m["id"]==key);
-        if !is_installed(&cfg,key,entry){return Err("Download dit model eerst via de AI-bibliotheek".into());}
+        if !is_installed(&cfg,key,entry){return Err("Download this model from the AI library first".into());}
         let previous=self.state.lock().map_err(err)?.active.clone();
         let ready=previous.as_deref()==Some(key)&&core::service_owned(&cfg,key)&&core::online(&cfg,key);
         if previous.as_deref()!=Some(key){self.stop_all()?;}
@@ -173,14 +173,14 @@ impl Runtime {
             let mut healthy=ready;
             for _ in 0..120{
                 if healthy{break;}
-                if self.closing.load(Ordering::Relaxed)||self.cancel_generation.load(Ordering::Relaxed){return Err("Aanvraag gestopt".into());}
-                if !core::service_owned(&cfg,key){return Err("Model kon niet laden. Bekijk het servicelog voor compatibiliteit of ontbrekende bestanden.".into());}
+                if self.closing.load(Ordering::Relaxed)||self.cancel_generation.load(Ordering::Relaxed){return Err("Request stopped".into());}
+                if !core::service_owned(&cfg,key){return Err("Model failed to load. Check the service log for compatibility issues or missing files.".into());}
                 let url=format!("http://127.0.0.1:{}/health",cfg["services"][key]["port"]);
                 let output=core::hidden("curl.exe").args(["-sS","--noproxy","*","--max-time","2",&url]).output().map_err(err)?;
                 if serde_json::from_slice::<Value>(&output.stdout).ok().is_some_and(|v|v["status"]=="ok"){healthy=true;break;}
                 std::thread::sleep(Duration::from_secs(1));
             }
-            if !healthy{return Err("Model werd niet gereed; bekijk het servicelog".into());}
+            if !healthy{return Err("Model did not become ready; check the service log".into());}
             self.state.lock().map_err(err)?.phase="generating".into();
             let instructions=prepare_profile(&mut body,entry);
             if key!="glm-ocr"&&!entry.is_some_and(|m|m["category"]=="vision"){if let Some(messages)=body["messages"].as_array_mut(){
@@ -190,7 +190,7 @@ impl Runtime {
             }}
             respond(&cfg,key,body)
         })();
-        let result=if self.cancel_generation.load(Ordering::Relaxed){Err("Aanvraag gestopt".into())}else{result};
+        let result=if self.cancel_generation.load(Ordering::Relaxed){Err("Request stopped".into())}else{result};
         if result.is_err(){let _=core::service(&self.root,key,false);}
         let mut state=self.state.lock().map_err(err)?;state.last_use=Instant::now();
         if let Ok(ref response)=result {state.phase="loaded".into();*state.tokens.entry(key.into()).or_default()+=response["usage"]["total_tokens"].as_u64().unwrap_or(0);}
@@ -199,22 +199,22 @@ impl Runtime {
     }
     pub fn start_download(self:&Arc<Self>,key:&str)->Result<()> {
         let cfg=core::config(&self.root)?;
-        let entry=catalog(&self.root)?.into_iter().find(|m|m["id"]==key).ok_or("Geen download beschikbaar voor dit model")?;
+        let entry=catalog(&self.root)?.into_iter().find(|m|m["id"]==key).ok_or("No download is available for this model")?;
         if is_installed(&cfg,key,Some(&entry)){return Ok(());}
-        if !entry["url"].is_string(){return Err("Dit lokale bestand ontbreekt; importeer het opnieuw".into());}
+        if !entry["url"].is_string(){return Err("This local file is missing; import it again".into());}
         {let mut job=self.download.lock().map_err(err)?;
-            if job["status"]=="downloading"||job["status"]=="verifying"||job["status"]=="importing"{return Err("Er loopt al een download of import".into());}
-            *job=json!({"id":key,"status":"downloading","total":entry["bytes"],"bytes":0,"message":"Download starten"});
+            if job["status"]=="downloading"||job["status"]=="verifying"||job["status"]=="importing"{return Err("A download or import is already running".into());}
+            *job=json!({"id":key,"status":"downloading","total":entry["bytes"],"bytes":0,"message":"Starting download"});
         }
         self.cancel.store(false,Ordering::Relaxed);
         let runtime=self.clone();std::thread::spawn(move||{
             let result=(||->Result<String>{
                 let mut parts=vec![&entry];if entry["projector"]["url"].is_string(){parts.push(&entry["projector"]);}
                 for part in parts{
-                    if runtime.cancel.load(Ordering::Relaxed){return Ok("Download gepauzeerd".into());}
+                    if runtime.cancel.load(Ordering::Relaxed){return Ok("Download paused".into());}
                     if let Some(file)=part["file"].as_str(){if downloaded_file_valid(&core::path(&cfg,"models").join(file),part){continue;}}
                     if let Ok(mut job)=runtime.download.lock(){job["file"]=part["file"].clone();job["total"]=part["bytes"].clone();job["status"]=json!("downloading");}
-                    core::download(&cfg,part["url"].as_str().ok_or("Downloadlink ontbreekt")?,part["file"].as_str().ok_or("Bestandsnaam ontbreekt")?,part["sha256"].as_str().ok_or("Checksum ontbreekt")?,runtime.cancel.clone(),|text|{
+                    core::download(&cfg,part["url"].as_str().ok_or("Download link is missing")?,part["file"].as_str().ok_or("Filename is missing")?,part["sha256"].as_str().ok_or("Checksum is missing")?,runtime.cancel.clone(),|text|{
                         if let Ok(mut job)=runtime.download.lock(){if text.contains("SHA-256"){job["status"]=json!("verifying");}job["message"]=json!(text);}
                     })?;
                 }Ok("Model en eventuele beeldprojector gecontroleerd".into())
@@ -226,7 +226,7 @@ impl Runtime {
         });Ok(())
     }
     pub fn enqueue(&self,key:&str)->Result<()>{
-        if !catalog(&self.root)?.iter().any(|m|m["id"]==key&&m["url"].is_string()){return Err("Model niet downloadbaar".into());}
+        if !catalog(&self.root)?.iter().any(|m|m["id"]==key&&m["url"].is_string()){return Err("Model cannot be downloaded".into());}
         let job=self.download.lock().map_err(err)?;
         if job["id"]==key&&["downloading","verifying","importing"].iter().any(|s|job["status"]==*s){return Ok(());}
         let mut queue=self.queue.lock().map_err(err)?;if !queue.iter().any(|id|id==key){queue.push(key.into());}Ok(())
@@ -236,7 +236,7 @@ impl Runtime {
         else if data["action"]=="remove"{self.queue.lock().map_err(err)?.retain(|id|Some(id.as_str())!=data["id"].as_str());}
         Ok(())
     }
-    /// Zoekt modellen via de Hugging Face-API voor de bibliotheek.
+    /// Searches the Hugging Face API for library models.
     pub fn store_search(&self,data:&Value)->Result<Value>{
         let mut busy=self.queue.lock().map_err(err)?.clone();
         {let job=self.download.lock().map_err(err)?;if let Some(id)=job["id"].as_str(){busy.push(id.to_string());}}
@@ -254,12 +254,12 @@ impl Runtime {
     pub fn select_file(&self,slot:&str,file:Option<PathBuf>){if let Ok(mut files)=self.selected_files.lock(){if let Some(file)=file{files.insert(slot.into(),file);}else{files.remove(slot);}}}
     pub fn import_model(self:&Arc<Self>,data:&Value)->Result<String>{
         let name=data["name"].as_str().unwrap_or("").trim().to_string();let category=data["category"].as_str().unwrap_or("chat").to_string();crate::custom_models::validate(&name,&category)?;
-        let files=self.selected_files.lock().map_err(err)?.clone();let model=files.get("model").cloned().ok_or("Kies eerst een GGUF-bestand")?;
-        let projector=if category=="vision"{Some(files.get("projector").cloned().ok_or("Kies ook de bijbehorende GGUF-projector")?)}else{None};
+        let files=self.selected_files.lock().map_err(err)?.clone();let model=files.get("model").cloned().ok_or("Choose a GGUF file first")?;
+        let projector=if category=="vision"{Some(files.get("projector").cloned().ok_or("Also choose the matching GGUF projector")?)}else{None};
         let total=fs::metadata(&model).map_err(err)?.len()+projector.as_ref().map(|p|fs::metadata(p).map(|m|m.len())).transpose().map_err(err)?.unwrap_or(0);
         let id=format!("custom-{}",core::id());let cfg=core::config(&self.root)?;
         {let mut job=self.download.lock().map_err(err)?;if ["downloading","verifying","importing"].iter().any(|v|job["status"]==*v){return Err("Wacht op de huidige download/import of pauzeer die eerst".into());}
-        *job=json!({"id":id,"status":"importing","bytes":0,"total":total,"message":"GGUF naar USB kopiëren en SHA-256 berekenen"});}
+        *job=json!({"id":id,"status":"importing","bytes":0,"total":total,"message":"Copy GGUF to USB and calculate SHA-256"});}
         self.cancel.store(false,Ordering::Relaxed);
         let runtime=self.clone();let selected_id=id.clone();let system_role=data["system_role"].as_bool().unwrap_or(true);
         std::thread::spawn(move||{
@@ -274,7 +274,7 @@ impl Runtime {
                 entry["id"]=json!(selected_id);entry["name"]=json!(name);entry["category"]=json!(category);entry["description"]=json!("Eigen GGUF-model op USB");entry["system_role"]=json!(system_role);
                 crate::custom_models::append(&runtime.root,entry)?;Ok(())
             })();
-            if let Ok(mut job)=runtime.download.lock(){match outcome{Ok(())=>{job["status"]=json!("ready");job["message"]=json!("Eigen model toegevoegd aan de bibliotheek");},Err(e)=>{job["status"]=json!("error");job["message"]=json!(e);}}}
+            if let Ok(mut job)=runtime.download.lock(){match outcome{Ok(())=>{job["status"]=json!("ready");job["message"]=json!("Custom model added to the library");},Err(e)=>{job["status"]=json!("error");job["message"]=json!(e);}}}
         });Ok(id)
     }
 }
@@ -304,5 +304,25 @@ fn idle_due(active:bool,elapsed:Duration,limit:u64)->bool{active&&elapsed>=Durat
         assert_eq!(prepare_profile(&mut ordinary,None),CHAT_INSTRUCTIONS);
         assert_eq!(ordinary,json!({"max_tokens":1500}));
     }
-    #[test]fn catalog_is_complete(){let root=core::root().unwrap();let entries=catalog(&root).unwrap();assert!(entries.len()>=19);assert!(entries.iter().any(|m|m["id"]=="mimo-7b"));for m in entries{assert_eq!(m["sha256"].as_str().unwrap().len(),64);if m["origin"]!="local"{assert!(m["url"].as_str().unwrap().starts_with("https://"));}}assert!(core::config(&root).unwrap()["services"].as_object().unwrap().len()>=21);}
+    #[test]fn catalog_is_complete(){
+        let project=core::root().unwrap();
+        let root=project.join("tools/temp").join(format!("catalog-{}",core::id()));
+        fs::create_dir_all(root.join("config")).unwrap();
+        for name in ["settings","custom-models","model-catalog"]{
+            fs::copy(project.join(format!("config/{name}.example.json")),root.join(format!("config/{name}.json"))).unwrap();
+        }
+        let entries=catalog(&root).unwrap();
+        assert_eq!(entries.len(),1);
+        assert_eq!(entries[0]["id"],"orvyn-1");
+        for m in entries{
+            let sha=m["sha256"].as_str().unwrap();
+            assert_eq!(sha.len(),64);
+            assert!(sha.bytes().all(|b|b.is_ascii_hexdigit()));
+            assert!(m["url"].as_str().unwrap().starts_with("https://"));
+        }
+        let cfg=core::config(&root).unwrap();
+        assert_eq!(cfg["services"].as_object().unwrap().len(),1);
+        assert!(cfg["services"]["orvyn-1"].is_object());
+        fs::remove_dir_all(root).unwrap();
+    }
 }

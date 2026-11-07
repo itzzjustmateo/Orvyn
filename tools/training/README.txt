@@ -1,64 +1,68 @@
-ORVYN 1 - EXPERIMENTEEL TRAININGSPAKKET
+ORVYN 1 - EXPERIMENTAL TRAINING PACKAGE
 
-Status: CPU-proef afgerond op 30 oktober 2026; kandidaat niet geschikt voor toepassing.
-24 LoRA-stappen met 4 CPU-threads zijn uitgevoerd. Training plus voor/nameting
-duurde 188 seconden na het laden van het model. De omgeving voorbereiden en het
-model laden duurden daarnaast langer. Het huidige appmodel is niet vervangen.
-Kandidaat: models/training/orvyn1-candidate-20261030-190726
-Resultaten: evaluation.json, answers.json en review.json in die map.
+Historical status: a CPU trial completed on October 30, 2026. The candidate was
+not suitable for activation. It ran 24 LoRA steps with four CPU threads.
+Training and before/after evaluation took 188 seconds after model loading;
+environment preparation and loading took additional time. The active app model
+was not replaced.
 
-De aparte evaluatieloss ging van 1.530 naar 1.541 (Nederlands), 3.499 naar 2.820
-(code), 2.179 naar 1.907 (web) en 3.313 naar 2.033 (Opex). Lager is hier beter.
-De vier gegenereerde toetsantwoorden laten geen betrouwbare verbetering zien:
-code beantwoordt een andere vraag, bronverwijzingen ontbreken en de leesactie
-van Opex is ongeldig. Deze kandidaat daarom niet samenvoegen of activeren.
+Candidate: models/training/orvyn1-candidate-20261030-190726
+Results: evaluation.json, answers.json, and review.json in that folder.
 
-Doelen: Nederlandse gesprekken, code, brongebruik en de bestaande Opex-acties.
-De proef hierboven gebruikte de oorspronkelijke seedset: 48 training, 16 toetsing.
-Actieve nieuwe dataset: data/training/orvyn-1/v2 (112 training, 48 toetsing).
-De oorspronkelijke JSONL-bestanden zijn behouden. De nieuwe set voegt gerichte
-voorbeelden toe voor opdrachtvolging, bronverwijzingen en het Opex-actieformaat.
-24 nieuwe Python-referentiefuncties zijn gecontroleerd op 36 invoer-uitvoergevallen.
-Er is nog geen nieuw model getraind op v2.
-De voorbeelden zijn eigen synthetische startvoorbeelden. Er zijn geen privechats
-gebruikt. Dit kleine pakket is bedoeld voor een technische proef, niet als bewijs
-dat het model op alle vier gebieden veel beter wordt. Breid de data uit met
-gecontroleerde, gevarieerde voorbeelden en een onafhankelijke praktijkevaluatie.
+Held-out loss changed from 1.530 to 1.541 for Dutch, 3.499 to 2.820 for code,
+2.179 to 1.907 for web, and 3.313 to 2.033 for Opex. Lower loss is better, but
+the four generated answers did not show reliable improvement: code answered a
+different question, citations were missing, and the Opex read action was invalid.
+Do not merge or activate this candidate.
 
-Hardware gevonden: 32 GB RAM, Intel UHD Graphics 630, geen CUDA GPU.
-Een CPU-proef is mogelijk, maar belast de pc. Deze proef gebruikte circa 5.2 GB RAM.
-De bestaande systeeminstallatie heeft PyTorch 2.14 CPU en Transformers 5.17.
-De nieuwe omgeving en caches blijven op de USB; systeemsoftware wordt niet aangepast.
+The original seed set contained 48 training and 16 evaluation examples. The v2
+dataset at data/training/orvyn-1/v2 contains 112 training and 48 evaluation
+examples. Original JSONL files are retained. The additions target instruction
+following, citations, and Opex action formatting. Twenty-four Python reference
+functions were checked against 36 input/output cases. No new model has yet been
+trained on v2. These are synthetic examples, not private conversations. Dataset
+validation does not prove model improvement. Extend the set with reviewed,
+varied examples and independent practical evaluation.
 
-In de app: Instellingen > Training toont kandidaten, voorbeelden en voor/na-antwoorden.
-Instellingen > Opstart toont de gemeten fasen van de huidige appstart.
-Voortgang van een nieuwe proef verschijnt via logs/training/progress.json.
-Oude voortgangsmeldingen bewijzen niet dat een proces nog draait.
+The dataset intentionally contains Dutch-language training and evaluation
+examples. Those examples retain their original language so their evaluation
+purpose remains meaningful. Application controls and documentation use English.
 
-Controle zonder training (gebruikt v2; --dataset seed kiest de eerdere set):
+Historical hardware: 32 GB RAM, Intel UHD Graphics 630, no CUDA GPU. The CPU trial
+used about 5.2 GB RAM. The existing system had PyTorch 2.14 CPU and Transformers
+5.17. New environments and caches remain on the USB; system software is not
+modified.
+
+Settings > Training shows candidates, examples, and before/after answers.
+Settings > Startup shows timings for the current app launch. New trial progress
+appears in logs/training/progress.json. Old progress does not prove a process is
+still running.
+
+Validate without training (--dataset seed selects the original set):
   python tools/training/train_orvyn.py
 
-Datacontrole en referentietests:
+Validate data and reference functions:
   python tools/training/check_data.py --dataset v2
   python tests/test_training.py
 
-Omgeving voorbereiden (installeert ontbrekende pakketten alleen in tools):
+Prepare the environment (missing packages are installed only under tools):
   powershell -File scripts/setup-training.ps1
 
-Kleine CPU-proef opnieuw uitvoeren (maakt een nieuwe aparte kandidaat):
+Run a new isolated CPU trial:
   tools/training-venv/Scripts/python.exe tools/training/train_orvyn.py --train --device cpu --steps 24 --threads 4
 
-Het script leest de bestaande GGUF en dequantiseert die naar float32. Dit vraagt
-meer RAM dan gewoon chatten. Het traint alleen LoRA-adapters en houdt de originele
-gewichten intact. Voor en na training wordt aparte evaluatieloss per domein gemeten.
-Alleen loss verbeteren is onvoldoende: beoordeel ook antwoorden en toolvoorstellen.
-PC-training geeft geen extra rechten, muisbediening of toegang tot nieuwe tools.
+The script reads the existing GGUF and dequantizes it to float32, requiring more
+RAM than normal chat. Only LoRA adapters are trained; original weights remain
+intact. Held-out loss is measured per domain before and after training. Review
+generated answers and tool proposals as well as loss. PC training grants no
+additional permissions, mouse control, or new tools.
 
-Uitvoer komt onder models/training/orvyn1-candidate-*. Het script registreert die
-adapter NIET in de app. Een geslaagde kandidaat moet nog inhoudelijk worden getest,
-samengevoegd/geconverteerd naar een passende GGUF en vergeleken met het huidige model.
-Er wordt niets naar een cloudtrainingdienst verzonden en er worden geen kosten gemaakt.
+Output is stored under models/training/orvyn1-candidate-*. Adapters are not
+registered in the app automatically. A successful candidate still requires
+content review, merging/conversion to a compatible GGUF, and comparison with
+the current model. Nothing is sent to a cloud training service and the script
+does not incur cloud training charges.
 
-Bronnen voor het ontwerp van de proef:
+Design references:
 https://huggingface.co/docs/transformers/gguf
 https://huggingface.co/docs/trl/peft_integration

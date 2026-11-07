@@ -4,7 +4,7 @@ import variant from '@jitl/quickjs-singlefile-browser-release-sync';
 // User code executes inside QuickJS/WASM, never in the worker's host JS context.
 // Only bounded console output crosses that boundary. No modules, host APIs or files.
 self.onmessage=async(event:MessageEvent<string>)=>{
-  if(typeof event.data!=='string'||event.data.length>50000){self.postMessage({error:'Maximaal 50.000 tekens code.'});return;}
+  if(typeof event.data!=='string'||event.data.length>50000){self.postMessage({error:'Maximum 50,000 characters of code.'});return;}
   try{
     const engine=await newQuickJSWASMModuleFromVariant(variant);
     self.postMessage({ready:true});

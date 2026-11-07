@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  web:
+    name: Web build and browser tests
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Initialize portable configuration
+        run: ./scripts/initialize-config.ps1
+      - name: Restore npm download cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: tools/cache/npm
+          key: npm-${{ runner.os }}-node22-${{ hashFiles('apps/web-ui/package-lock.json') }}
+      - name: Install locked web dependencies
+        run: |
+          . ./scripts/usb-environment.ps1
+          Push-Location apps/web-ui
+          try {
+            npm ci
+            if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+          } finally { Pop-Location }
+      - name: Check TypeScript
+        run: node apps/web-ui/node_modules/typescript/bin/tsc --project apps/web-ui/tsconfig.json --noEmit --incremental false
+      - name: Build desktop web bundle
+        run: ./scripts/build-ui.ps1
+      - name: Test chat streaming
+        run: node tests/chat-client.mjs
+      - name: Test workspace in Microsoft Edge
+        run: |
+          . ./scripts/usb-environment.ps1
+          node tests/workspace-ui.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Workspace browser tests failed' }
+      - name: Test Opex Work in Microsoft Edge
+        run: |
+          . ./scripts/usb-environment.ps1
+          node tests/opex-work-ui.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Opex browser tests failed' }
+
+  native:
+    name: Windows native tests and build
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Select verified Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --no-self-update
+          if ($LASTEXITCODE -ne 0) { throw 'Rust toolchain installation failed' }
+          rustup default 1.97.1-x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Rust toolchain selection failed' }
+      - name: Initialize portable configuration
+        run: ./scripts/initialize-config.ps1
+      - name: Restore Cargo dependencies and compiled artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            tools/cache/cargo/registry
+            apps/manager/build-usb
+          key: cargo-${{ runner.os }}-msvc-rust1.97.1-${{ hashFiles('apps/manager/Cargo.lock', 'apps/manager/build.rs', 'scripts/rust-environment.ps1') }}
+      - name: Prepare locked Cargo cache
+        run: ./scripts/prepare-cargo-cache.ps1
+      - name: Run native tests offline
+        run: ./scripts/test-manager.ps1
+      - name: Build desktop executable offline
+        run: ./scripts/build-desktop.ps1

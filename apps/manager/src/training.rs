@@ -11,7 +11,7 @@ fn dataset(root:&Path)->PathBuf{
     let seed=root.join("data/training/orvyn-1");let v2=seed.join("v2");if v2.is_dir(){v2}else{seed}
 }
 fn rows(root:&Path,split:&str)->Result<Vec<Value>>{
-    if !["train","eval"].contains(&split){return Err("Kies train of eval.".into());}
+    if !["train","eval"].contains(&split){return Err("Choose train or eval.".into());}
     let path=dataset(root).join(format!("{split}.jsonl"));
     if !path.exists(){return Ok(vec![]);}
     if fs::metadata(&path).map_err(err)?.len()>2_000_000{return Err("Trainingsset is groter dan 2 MB.".into());}
@@ -24,11 +24,11 @@ pub fn examples(root:&Path,input:&Value)->Result<Value>{
     Ok(json!({"examples":rows(root,split)?.into_iter().filter(|r|r["domain"]==domain).take(100).collect::<Vec<_>>()}))
 }
 pub fn candidate(root:&Path,input:&Value)->Result<Value>{
-    let id=input["id"].as_str().ok_or("Kandidaat ontbreekt")?;
-    if !id.starts_with("orvyn1-candidate-")||id.len()>100||!id.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'){return Err("Ongeldige kandidaat-id.".into());}
+    let id=input["id"].as_str().ok_or("Candidate is missing")?;
+    if !id.starts_with("orvyn1-candidate-")||id.len()>100||!id.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'){return Err("Invalid candidate ID.".into());}
     let parent=fs::canonicalize(root.join("models/training")).map_err(err)?;
     let dir=fs::canonicalize(parent.join(id)).map_err(err)?;
-    if !dir.starts_with(&parent)||!dir.is_dir(){return Err("Kandidaat staat buiten de trainingsmap.".into());}
+    if !dir.starts_with(&parent)||!dir.is_dir(){return Err("Candidate is outside the training folder.".into());}
     Ok(json!({"id":id,"evaluation":optional(&dir.join("evaluation.json")),"answers":optional(&dir.join("answers.json")),
         "review":optional(&dir.join("review.json")),"integrity":optional(&dir.join("integrity.json"))}))
 }
@@ -45,22 +45,22 @@ pub fn overview(root:&Path)->Result<Value>{
         match rows(root,split){
             Err(e)=>issues.push(e),
             Ok(rows)=>{
-                if rows.is_empty(){issues.push(format!("Geen voorbeelden in {split}."));}
+                if rows.is_empty(){issues.push(format!("No examples in {split}."));}
                 for row in rows{
                     let id=row["id"].as_str().unwrap_or("");let domain=row["domain"].as_str().unwrap_or("");
                     if id.is_empty()||!ids.insert(id.to_owned()){issues.push(format!("Ontbrekende of dubbele id: {id}"));}
-                    if !["nl","code","web","pc"].contains(&domain){issues.push(format!("{id}: ongeldig onderwerp"));continue;}
+                    if !["nl","code","web","pc"].contains(&domain){issues.push(format!("{id}: invalid topic"));continue;}
                     counts[split][domain]=json!(counts[split][domain].as_u64().unwrap_or(0)+1);
                     let messages=row["messages"].as_array();
-                    if !messages.is_some_and(|m|m.len()==3&&["system","user","assistant"].iter().enumerate().all(|(i,role)|m[i]["role"]==*role&&m[i]["content"].as_str().is_some_and(|s|!s.trim().is_empty()))){issues.push(format!("{id}: ongeldige berichten"));continue;}
+                    if !messages.is_some_and(|m|m.len()==3&&["system","user","assistant"].iter().enumerate().all(|(i,role)|m[i]["role"]==*role&&m[i]["content"].as_str().is_some_and(|s|!s.trim().is_empty()))){issues.push(format!("{id}: invalid messages"));continue;}
                     let prompt=row["messages"][1]["content"].as_str().unwrap().split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
-                    if !prompts.insert(prompt){issues.push(format!("{id}: dubbele vraag of overlap tussen training en toetsing"));}
+                    if !prompts.insert(prompt){issues.push(format!("{id}: duplicate question or overlap between training and evaluation"));}
                     if domain=="pc"{
                         let answer:Result<Value>=serde_json::from_str(row["messages"][2]["content"].as_str().unwrap()).map_err(err);
-                        if answer.and_then(|v|crate::opex::proposal(&v)).is_err(){issues.push(format!("{id}: ongeldige Opex-actie"));}
+                        if answer.and_then(|v|crate::opex::proposal(&v)).is_err(){issues.push(format!("{id}: invalid Opex action"));}
                     }
                 }
-                for domain in ["nl","code","web","pc"]{if counts[split][domain]==0{issues.push(format!("{split}: geen voorbeelden voor {domain}"));}}
+                for domain in ["nl","code","web","pc"]{if counts[split][domain]==0{issues.push(format!("{split}: no examples for {domain}"));}}
             }
         }
     }

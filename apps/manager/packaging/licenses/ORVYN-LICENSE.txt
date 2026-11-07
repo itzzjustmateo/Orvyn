@@ -1,0 +1,61 @@
+Orvyn Free Redistribution License 1.0
+November 6, 2026
+
+Copyright (c) 2026 Orvyn contributors
+
+1. Scope
+
+This license applies to original Orvyn application code and documentation
+expressly released under this license (the "Software"), to the extent the
+licensor holds the necessary rights. It is a custom source-available license,
+not the MIT License or an OSI-approved open-source license.
+
+2. Permission
+
+Subject to the conditions below, you may use, copy, inspect, modify, and
+distribute the Software, in source or executable form, including modified
+versions, without a license fee. Personal use and internal business use are
+permitted. Recipients receive these same permissions directly under this
+license.
+
+3. No paid redistribution
+
+Without separate written permission from the relevant copyright holder(s),
+you must not sell, rent, sublicense for a fee, or otherwise redistribute the
+Software, including modified versions, in exchange for money or other
+compensation. This includes paid downloads, paid subscription delivery, and
+bundling the Software into a product or distribution for which payment is
+required. Distribution must not be conditional on a donation, purchase, or
+other payment.
+
+You may redistribute the Software free of charge. You may charge separately
+for independent support or consulting services only when obtaining the
+Software is not conditional on purchasing those services and no charge is
+made for the Software itself.
+
+4. Notices and modifications
+
+Every redistributed copy must retain this license, applicable copyright
+notices, and third-party notices. Modified versions must identify that they
+have been modified and must retain these conditions for the covered Orvyn
+material. Do not claim that a modified or redistributed copy is an official
+Orvyn release without authorization. No trademark rights are granted.
+
+5. Earlier releases and third-party material
+
+This license does not revoke or restrict permissions already granted for
+earlier copies under the MIT License or another license. Material previously
+received under MIT remains available under those terms. This license does
+not override third-party licenses, including licenses for model weights,
+llamafile, libraries, and other separately licensed components. Those
+components remain subject to their own terms, including any distribution
+rights they independently grant. Nothing in this license restricts rights
+that applicable law does not permit the licensor to restrict.
+
+6. Warranty and liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT
+PERMITTED BY LAW, THE AUTHORS AND COPYRIGHT HOLDERS SHALL NOT BE LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.

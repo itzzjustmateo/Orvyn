@@ -41,7 +41,7 @@ export function ModelLibrary({open,onClose,models,selected,onSelect,download,onD
   useEffect(()=>{if(open&&!storeRan.current){storeRan.current=true;storeSearch(true);}},[open]);
   useEffect(()=>{if(open&&!ref.current?.open)ref.current?.showModal();else if(!open&&ref.current?.open)ref.current.close();},[open]);
   const busy=["downloading","verifying","importing"].includes(download.status);
-  // Woord-voor-woord, zodat "llama 3.2" ook "Llama-3.2-…" in de bibliotheek vindt.
+  // Match word by word so "llama 3.2" also finds "Llama-3.2-…" in the library.
   const terms=query.toLowerCase().split(/\s+/).filter(Boolean);
   const visible=models.filter(m=>(category==="all"||(category==="favorites"?favorites.includes(m.id):category==="remote"?m.remote:category==="installed"?m.installed&&!m.remote:category==="custom"?m.custom:m.category===category))&&terms.every(term=>`${m.name} ${m.description}`.toLowerCase().includes(term))).sort((a,b)=>Number(favorites.includes(b.id))-Number(favorites.includes(a.id)));
   return <dialog ref={ref} onCancel={onClose} onClose={onClose} aria-labelledby="model-library-title"
@@ -61,7 +61,7 @@ export function ModelLibrary({open,onClose,models,selected,onSelect,download,onD
     <Tabs value={category} onValueChange={setCategory} className="px-6 pt-4">
       <TabsList aria-label="Model categories">{[["all","All"],["favorites","Favorites"],["installed","On USB"],["remote","Online / API"],["custom","Custom models"],["chat","Chat"],["code","Code"],["reasoning","Reasoning"],["vision","Vision / OCR"]].map(([value,label])=><TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}</TabsList>
     </Tabs>
-    {(queue.length>0||queuePaused)&&<div className="mx-6 mt-4 rounded-xl border border-white/10 p-3 text-xs"><p>Download queue {queuePaused?'· gepauzeerd':''} · blijft actief zolang de app open is</p>{queue.map(id=><div key={id} className="mt-2 flex justify-between"><span>{models.find(m=>m.id===id)?.name||id}</span><button onClick={()=>onQueue({action:'remove',id})}>Remove</button></div>)}{queuePaused&&<Button size="sm" onClick={()=>onQueue({action:'resume'})}>Resume queue</Button>}</div>}
+    {(queue.length>0||queuePaused)&&<div className="mx-6 mt-4 rounded-xl border border-white/10 p-3 text-xs"><p>Download queue {queuePaused?'· paused':''} · remains active while the app is open</p>{queue.map(id=><div key={id} className="mt-2 flex justify-between"><span>{models.find(m=>m.id===id)?.name||id}</span><button onClick={()=>onQueue({action:'remove',id})}>Remove</button></div>)}{queuePaused&&<Button size="sm" onClick={()=>onQueue({action:'resume'})}>Resume queue</Button>}</div>}
     <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
       {visible.map(model=>{
         const quality=model.custom?undefined:modelQuality[model.id];
@@ -71,11 +71,11 @@ export function ModelLibrary({open,onClose,models,selected,onSelect,download,onD
         return <Card key={model.id} size="compact" selected={selected===model.id} className="bg-[#262626]">
           <CardHeader><div className="mb-2 flex items-center justify-between gap-2"><AnimatedBadge size="sm" status={model.online?"success":model.installed?"neutral":"info"}>{model.remote?"Online / API":model.online?"Loaded":model.installed?"On USB":model.store?"From Hugging Face":model.can_download===false?"File missing":"Available to download"}</AnimatedBadge><span className="text-xs text-gray-400">{model.remote?"API":model.bytes>0?`${(model.bytes/1e9).toFixed(2)} GB${model.store&&model.downloads?` · ${compact(model.downloads)} downloads`:""}`:"Unknown size"}</span></div>
             <div className="flex items-start justify-between gap-2"><CardTitle>{model.name}</CardTitle><button aria-label={`${model.name} ${favorites.includes(model.id)?'remove from favorites':'add to favorites'}`} aria-pressed={favorites.includes(model.id)} onClick={()=>onFavorite(model.id)}><Star className={`size-5 ${favorites.includes(model.id)?'fill-teal-400 text-teal-400':'text-gray-500'}`}/></button></div>
-            {quality!==undefined?<div role="img" aria-label={`Indicatieve kwaliteit: ${quality} van 5 sterren binnen de categorie`} title="Redactionele inschatting voor de eigen categorie; geen benchmarkscore" className="my-2 flex items-center gap-1">
+            {quality!==undefined?<div role="img" aria-label={`Indicative quality: ${quality} out of 5 stars within the category`} title="Editorial estimate within the category; not a benchmark score" className="my-2 flex items-center gap-1">
               {[1,2,3,4,5].map(star=><Star key={star} aria-hidden="true" className={`size-4 ${star<=quality?"fill-amber-400 text-amber-400":"text-gray-600"}`}/>)}
               <span aria-hidden="true" className="ml-1 text-xs text-gray-400">{quality}/5 · indicatief</span>
             </div>:<p className="my-2 text-xs text-gray-400">{model.store?"Community model from Hugging Face · not rated yet":"Quality not yet evaluated"}</p>}
-            {scores(model)&&<div className="my-2 space-y-1">{Object.entries(scores(model)!).map(([label,value])=><div key={label} className="flex justify-between text-xs"><span className="text-gray-400">{label}</span><span role="img" aria-label={`${label}: ${value} van 5, indicatief`} className="text-amber-300">{'★'.repeat(value)}<span className="text-gray-600">{'☆'.repeat(5-value)}</span></span></div>)}</div>}
+            {scores(model)&&<div className="my-2 space-y-1">{Object.entries(scores(model)!).map(([label,value])=><div key={label} className="flex justify-between text-xs"><span className="text-gray-400">{label}</span><span role="img" aria-label={`${label}: ${value} out of 5, indicative`} className="text-amber-300">{'★'.repeat(value)}<span className="text-gray-600">{'☆'.repeat(5-value)}</span></span></div>)}</div>}
             <CardDescription>{model.description}</CardDescription></CardHeader>
           <CardContent className="flex-1 text-xs text-gray-500">{model.remote?"Messages are processed by the API provider.":model.bytes===0?"Size is determined after downloading":model.bytes>4e9?"Larger model · more memory and processing time":"Compact model · suitable for local use"}
             <p className="mt-2 text-gray-400">{model.remote?"No local model download required. Your provider API rates apply.":recommend(model,hardware)}</p>

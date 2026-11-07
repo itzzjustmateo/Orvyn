@@ -47,7 +47,7 @@ fn run() -> core::Result<()> {
                             if core::online(&cfg, key) {
                                 "bereikbaar"
                             } else {
-                                "offline/laden"
+                                "offline/loading"
                             }
                         );
                     } else {

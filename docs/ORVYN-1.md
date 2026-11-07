@@ -1,30 +1,17 @@
 # Orvyn 1
 
-Orvyn 1 is een lokaal chatprofiel op de bestaande Llama 3.2 1B Instruct
-Q4_K_M-gewichten (807.694.464 bytes). Het is geen nieuw getraind model.
-Het deelt het bestaande GGUF-bestand; er is geen extra modelkopie gedownload.
+Orvyn 1 is a local chat profile using the existing Llama 3.2 1B Instruct Q4_K_M weights (807,694,464 bytes). It is not a newly trained foundation model. The profile shares the existing GGUF file rather than downloading another copy.
 
-Eigen instructies: kort, direct en standaard Nederlands.
-Generatie: maximaal 512 antwoordtokens, temperatuur 0,3, top_p 0,9.
-Een lager aangevraagd tokenmaximum blijft behouden.
-Langere codebestanden en complexe redeneertaken passen beter bij een groter model.
-De werkelijke snelheid hangt af van de pc en het laden vanaf de USB.
+The current profile requests concise, direct answers in English by default. Generation uses up to 512 response tokens, temperature 0.3, and top_p 0.9. A lower requested token limit is preserved. Larger models are better suited to long code files and complex reasoning. Actual speed depends on the PC and USB loading speed.
 
-Kies na herstart Orvyn 1 in de modelkeuze of de AI-bibliotheek.
-Configuratie: config/custom-models.json.
-Basismodel, herkomst en controlehash blijven in die configuratie vermeld.
+Select Orvyn 1 from the model selector or AI library after restarting. Its configuration is in `config/custom-models.json`, including the base model, source, and verification hash.
 
-## Websites en snelheid
+## Websites and performance
 
-Plak bij Orvyn 1 een openbare HTTPS-link in je vraag, bijvoorbeeld:
-"Vat https://example.com samen". De app leest maximaal twee links, geeft
-tekstfragmenten aan het model en toont de bronnen. Het is geen interactieve
-browser: inloggen, JavaScript-apps, PDF en IPv6-only sites worden niet ondersteund.
-De website ontvangt de URL-aanvraag, niet je volledige chat. Een pagina blijft
-vijf minuten in het werkgeheugen gecachet. Privé- en lokale IP-adressen zijn geblokkeerd.
+Include a public HTTPS link in a question, such as “Summarize https://example.com”. The app reads up to two links, supplies text excerpts to the model, and displays sources. This is not an interactive browser: sign-in, JavaScript applications, PDFs, and IPv6-only sites are unsupported.
 
-Orvyn 1 gebruikt nu één servergespreksplek in plaats van vier, duidelijke basisinstructies en maximaal 512 antwoordtokens. Een geladen, bereikbaar model
-slaat de herhaalde start- en curl-gezondheidscontrole over.
-De eerste start blijft afhankelijk van USB- en Windows-bestandscaches.
+The website receives the URL request, not the full chat. Pages are cached in memory for five minutes. Private and local IP addresses are blocked.
 
-Live-test 30 oktober 2026: eerste reactie inclusief laden 45,49 s; korte vervolgvraag 0,195 s. Dit zijn metingen op deze pc, geen gegarandeerde tijden. Website lezen, cache en blokkade van een lokaal adres zijn getest.
+Orvyn 1 uses one server conversation slot rather than four, clear base instructions, and a maximum of 512 response tokens. A loaded, reachable model skips repeated startup and curl health checks. Initial startup still depends on USB and Windows file caches.
+
+A historical live test on October 30, 2026 measured 45.49 seconds for the first response including loading, and 0.195 seconds for a short follow-up. These are measurements from one PC, not guaranteed timings. Website reading, caching, and local-address blocking were also tested.

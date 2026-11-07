@@ -24,7 +24,7 @@ for($round=1;$round -le $Rounds;$round++){
     try{
         while($watch.Elapsed.TotalSeconds -lt 180){
             $process.Refresh()
-            if($process.HasExited){throw 'App stopte voor gereedmelding'}
+            if($process.HasExited){throw 'App exited before reporting ready'}
             if($null -eq $window -and $process.MainWindowHandle -ne 0){$window=$watch.Elapsed.TotalSeconds}
             if(Test-Path $sessionPath){try{$session=Get-Content $sessionPath -Raw | ConvertFrom-Json;if($session.ui_loaded){$loaded=$true;break}}catch{}}
             Start-Sleep -Milliseconds 150

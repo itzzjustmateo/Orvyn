@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react';
 import {api} from '@/lib/workspace';
 type Phase={id:string;label:string;duration_ms:number};
 type Report={complete:boolean;total_ms:number;phases:Phase[];note:string;frontend?:{storage_ms?:number;dom_ms?:number;resources?:{path:string;duration_ms:number}[]}};
-const seconds=(ms:number)=>`${(ms/1000).toLocaleString('nl-NL',{maximumFractionDigits:2})} s`;
+const seconds=(ms:number)=>`${(ms/1000).toLocaleString('en-GB',{maximumFractionDigits:2})} s`;
 export default function StartupDiagnostics(){
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState('');
  useEffect(()=>{let live=true,pending=false;async function refresh(){if(pending)return;pending=true;try{const value=await api('/api/diagnostics/startup');if(live){setReport(value);setError('');}}catch(e){if(live)setError(String(e));}finally{pending=false;}}void refresh();const timer=setInterval(refresh,5000);return()=>{live=false;clearInterval(timer);};},[]);

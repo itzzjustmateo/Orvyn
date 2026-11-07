@@ -1,14 +1,19 @@
 #define Root SourcePath + "\..\..\.."
+#ifndef Package
 #define Package Root + "\dist\Orvyn-portable"
+#endif
+#ifndef OutputSuffix
+#define OutputSuffix ""
+#endif
 #ifndef AppVersion
-  #define AppVersion "0.6.0"
+  #define AppVersion "0.7.0"
 #endif
 [Setup]
 AppId=OrvynPortable
 AppName=Orvyn
 AppVersion={#AppVersion}
 AppVerName=Orvyn {#AppVersion}
-VersionInfoDescription=Orvyn installer with Orvyn 1
+VersionInfoDescription=Orvyn installer {#AppVersion}{#OutputSuffix}
 DefaultDirName={src}\Orvyn
 DefaultGroupName=Orvyn
 PrivilegesRequired=lowest
@@ -27,7 +32,7 @@ DisableDirPage=no
 LanguageDetectionMethod=none
 ShowLanguageDialog=no
 OutputDir={#Root}\dist
-OutputBaseFilename=Orvyn-Setup-{#AppVersion}
+OutputBaseFilename=Orvyn-Setup-{#AppVersion}{#OutputSuffix}
 SetupIconFile={#Root}\apps\manager\assets\orvyn.ico
 Compression=zip/1
 SolidCompression=no
@@ -35,8 +40,8 @@ WizardStyle=modern
 MinVersion=10.0
 CloseApplications=yes
 RestartApplications=no
-InfoBeforeFile={#Root}\apps\manager\packaging\INSTALL.txt
-LicenseFile={#Root}\apps\manager\packaging\licenses\LLAMA-3.2-LICENSE.txt
+InfoBeforeFile={#Package}\README.txt
+LicenseFile={#Root}\LICENSE
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
@@ -51,12 +56,14 @@ Source: "{#Package}\README.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Package}\apps\web-ui\dist\*"; DestDir: "{app}\apps\web-ui\dist"; Flags: ignoreversion recursesubdirs
 Source: "{#Package}\runtime\llamafile\llamafile-0.10.6.exe"; DestDir: "{app}\runtime\llamafile"; Flags: ignoreversion
 ; Never overwrite or uninstall a user's model or settings.
+#if OutputSuffix == ""
 Source: "{#Package}\models\desktop-active\llama32-1b.gguf"; DestDir: "{app}\models\desktop-active"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "{#Package}\models\desktop-active\llama32-1b.gguf.verified.json"; DestDir: "{app}\models\desktop-active"; Flags: onlyifdoesntexist uninsneveruninstall
-Source: "{#Root}\config\settings.example.json"; DestDir: "{app}\config"; DestName: "settings.json"; Flags: onlyifdoesntexist uninsneveruninstall
-Source: "{#Root}\config\custom-models.example.json"; DestDir: "{app}\config"; DestName: "custom-models.json"; Flags: onlyifdoesntexist uninsneveruninstall
-Source: "{#Root}\config\model-catalog.example.json"; DestDir: "{app}\config"; DestName: "model-catalog.json"; Flags: onlyifdoesntexist uninsneveruninstall
-Source: "{#Root}\apps\manager\packaging\INSTALL.txt"; DestDir: "{app}"; Flags: ignoreversion
+#endif
+Source: "{#Package}\config\settings.json"; DestDir: "{app}\config"; DestName: "settings.json"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "{#Package}\config\custom-models.json"; DestDir: "{app}\config"; DestName: "custom-models.json"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "{#Package}\config\model-catalog.json"; DestDir: "{app}\config"; DestName: "model-catalog.json"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "{#Package}\README.txt"; DestDir: "{app}"; DestName: "INSTALL.txt"; Flags: ignoreversion
 Source: "{#Root}\apps\manager\packaging\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion uninsneveruninstall
 [Dirs]
 Name: "{app}\data"; Flags: uninsneveruninstall

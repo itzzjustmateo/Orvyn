@@ -1,22 +1,21 @@
-Opex pc-toegang
+Opex PC access
 ==============
 
-Kies in Opex een projectmap op de USB en klik Project verbinden.
-Chat en Plan voeren geen acties uit. Agent stelt telkens een leesactie,
-bestandswijziging of PowerShell-opdracht voor. Controleer de stap en keur deze
-goed. Klik daarna opnieuw Volgende stap voorstellen voor de vervolgactie.
+Choose a project folder on the USB in Opex and click Connect project.
+Chat and Plan do not execute actions. Agent proposes a file read, file change,
+or PowerShell command. Review and approve each step, then click Propose next
+step to continue.
 
-Bestandsacties controleren dat het pad binnen de gekozen map blijft.
-Wijzigingen tonen een verschil, controleren of de inhoud nog hetzelfde is en
-bewaren het origineel met padinformatie onder backups/opex-*.
-Een nieuw bestand kan alleen in een bestaande map worden aangemaakt.
-PowerShell heeft de rechten van de huidige Windows-gebruiker; dit is geen
-sandbox. Opdrachten kunnen buiten de projectmap werken en internet gebruiken.
-Na 60 seconden wordt de procesboom gestopt. Uitvoer staat onder logs/opex.
-Gedeelde inhoud en uitvoer gaan bij een API-model naar die provider.
-De actiesessie is tijdelijk en verdwijnt bij sluiten van de werkruimte.
+File actions check that paths remain within the selected folder. Changes show
+a diff, check that the content has not changed, and save the original with path
+information under backups/opex-*. New files require an existing parent folder.
 
-Chatmodus (Chat, Plan, Code) wordt bewaard bij je bestaande voorkeuren.
-Het logo is ingebouwd in het Windows-programma en ingesteld op het hoofdvenster.
-Sluit Orvyn en start ORVYN.bat om de bijgewerkte executable te gebruiken.
-Linux-ondersteuning is op verzoek niet toegevoegd.
+PowerShell runs with the current Windows user's permissions. It is not a
+sandbox: commands can access locations outside the project and use the internet.
+The process tree is stopped after 60 seconds. Output is stored under logs/opex.
+When using an API model, shared content and output are sent to that provider.
+The action session is temporary and ends when the workspace closes.
+
+Chat mode (Chat, Plan, Code) is saved with your preferences. The logo is embedded
+in the Windows application and used by the main window. Close Orvyn and run
+START.bat to load an updated executable. Linux support is not included.

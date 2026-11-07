@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Orvyn",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Portable AI workspace with Orvyn 1 included"
   },
   "model_policy": {

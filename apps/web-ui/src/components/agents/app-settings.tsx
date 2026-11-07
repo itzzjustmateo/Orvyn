@@ -18,7 +18,7 @@ export function AppSettings({open,onClose,preferences:p,onChange,hardware,onRefr
       {open&&tab==="Startup"&&<Suspense fallback={<p>Loading startup diagnostics…</p>}><StartupDiagnostics/></Suspense>}
       {open&&tab==="Training"&&<Suspense fallback={<p>Loading training lab…</p>}><TrainingDashboard/></Suspense>}
       {tab==="General"&&<>
-        <label className="block text-sm">Response language<select aria-label="Default response language" className={field} value={p.language} onChange={e=>patch({language:e.target.value})}>{["Nederlands","English","Deutsch","Français"].map(v=><option key={v}>{v}</option>)}</select></label>
+        <label className="block text-sm">Response language<select aria-label="Default response language" className={field} value={p.language} onChange={e=>patch({language:e.target.value})}>{[["Nederlands","Dutch"],["English","English"],["Deutsch","German"],["Français","French"]].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label className="block text-sm">Response style<select aria-label="Default response style" className={field} value={p.style} onChange={e=>patch({style:e.target.value})}>{[["normaal","Balanced"],["kort","Concise"],["uitgebreid","Detailed"],["eenvoudig","Simple"],["technisch","Technical"]].map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label className="flex gap-3 text-sm"><input type="checkbox" checked={p.autoModel} onChange={e=>patch({autoModel:e.target.checked})}/>Smart selection for local models</label>
         <label className="flex gap-3 text-sm"><input type="checkbox" checked={p.enterToSend!==false} onChange={e=>patch({enterToSend:e.target.checked})}/>Enter sends a message</label>

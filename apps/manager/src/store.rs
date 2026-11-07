@@ -1,6 +1,6 @@
-//! Hugging Face-modelwinkel: zoekt GGUF-modellen via de API en voegt ze aan de bibliotheek toe.
-//! Zoekresultaten worden als catalogusentries bewaard, zodat de bestaande geverifieerde
-//! downloadwachtrij, categorieën en service-instellingen ook voor winkelmodellen gelden.
+//! Hugging Face model store: finds GGUF models through the API and adds them to the library.
+//! Search results are saved as catalog entries so the existing verified
+//! download queue, categories, and service settings also apply to store models.
 use crate::core::{self, err, Result};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -44,12 +44,12 @@ fn get(url: &str, timeout: &str) -> Result<Value> {
     };
     match status.trim() {
         "200" => serde_json::from_slice(body.as_bytes())
-            .map_err(|_| "Hugging Face gaf een onbegrijpelijk antwoord".into()),
-        "429" | "503" | "504" => Err("Hugging Face is even overbelast; probeer het zo opnieuw".into()),
+            .map_err(|_| "Hugging Face returned an unreadable response".into()),
+        "429" | "503" | "504" => Err("Hugging Face is temporarily overloaded; try again shortly".into()),
         "401" | "403" | "404" => {
-            Err("Hugging Face weigerde dit verzoek of kende het model niet".into())
+            Err("Hugging Face rejected this request or could not find the model".into())
         }
-        _ => Err("Hugging Face is nu niet bereikbaar. Controleer de internetverbinding.".into()),
+        _ => Err("Hugging Face is currently unreachable. Check your internet connection.".into()),
     }
 }
 fn encode(query: &str) -> String {
@@ -65,7 +65,7 @@ fn hash(text: &str) -> u32 {
     }
     value
 }
-/// Stabiele, serviceveilige id voor een Hugging Face-repository.
+/// Stable service-safe ID for a Hugging Face repository.
 fn slug(repo: &str) -> String {
     let mut out = String::new();
     let mut dash = false;
@@ -96,7 +96,7 @@ fn quant(file: &str) -> String {
         .unwrap_or("")
         .to_uppercase()
 }
-/// Voorkeursvolgorde voor een USB-model: kwaliteit eerst, daarna bestandsgrootte.
+/// USB model preference order: quality first, then file size.
 fn score(lower: &str) -> i32 {
     for (token, value) in [
         ("q4_k_m", 100),
@@ -115,7 +115,7 @@ fn score(lower: &str) -> i32 {
         ("q2_k", 24),
     ] {
         if lower.contains(token) {
-            // Q4_0-varianten voor edge-apparaten zijn geen gewone Q4_0.
+            // Q4_0 variants for edge devices are not standard Q4_0.
             if lower.contains("q4_0_4_4") || lower.contains("q4_0_4_8") || lower.contains("q4_0_8_8") {
                 return value - 60;
             }
@@ -155,7 +155,7 @@ fn pick(siblings: &[Value]) -> Option<(String, String, u64)> {
             continue;
         }
         let lower = name.to_lowercase();
-        // Projectors en deelbestanden zijn geen zelfstandig model.
+        // Projectors and split files are not standalone models.
         if lower.contains("mmproj") || lower.contains("projector") || lower.contains("-of-") {
             continue;
         }
@@ -209,7 +209,7 @@ fn category(name: &str, tags: &[String], pipeline: &str) -> String {
         .map(|c| if c == '-' || c == '_' { ' ' } else { c })
         .collect();
     let words: Vec<&str> = hay.split_whitespace().collect();
-    // Korte tokens als "ocr" tellen alleen als heel woord; "code" mag ook in "codellama".
+    // Short tokens such as "ocr" must match a whole word; "code" may also match "codellama".
     let inside = |tokens: &[&str]| {
         words
             .iter()
@@ -275,7 +275,7 @@ fn model_entry(repo: &str, detail: &Value, item: &Value) -> Option<Value> {
     }
     Some(entry)
 }
-/// Bewaart nieuwe winkelmodellen en haalt de oudste niet-geïnstalleerde entries weg.
+/// Saves new store models and removes the oldest uninstalled entries.
 fn cap(models: &mut Vec<Value>, dir: &Path, protect: &[String]) {
     while models.len() > MAX_STORE {
         let index = models.iter().position(|entry| {
@@ -303,7 +303,7 @@ fn persist(root: &Path, entries: Vec<Value>, protect: &[String], loaded: bool) -
     };
     let models = data["models"]
         .as_array_mut()
-        .ok_or("Ongeldige modelwinkel-catalogus")?;
+        .ok_or("Invalid store model catalog")?;
     let mut added = 0;
     for entry in entries {
         if !models.iter().any(|stored| stored["id"] == entry["id"]) {
@@ -311,7 +311,7 @@ fn persist(root: &Path, entries: Vec<Value>, protect: &[String], loaded: bool) -
             added += 1;
         }
     }
-    // Opruimen verschuift de poorten van latere modellen; doe dat alleen als er niets geladen is.
+    // Cleanup shifts later model ports; do it only when no model is loaded.
     if models.len() > MAX_STORE && !loaded {
         let cfg = core::config(root)?;
         let dir = core::path(&cfg, "models");
@@ -323,7 +323,7 @@ fn persist(root: &Path, entries: Vec<Value>, protect: &[String], loaded: bool) -
 fn run(root: &Path, data: &Value, protect: &[String], loaded: bool) -> Result<Value> {
     let query = data["query"].as_str().unwrap_or("").trim();
     if query.chars().count() > 60 || query.chars().any(|c| c.is_control()) {
-        return Err("Ongeldige zoekterm".into());
+        return Err("Invalid search term".into());
     }
     let mut url = format!("{ENDPOINT}?filter=gguf&sort=downloads&direction=-1&limit={LIMIT}");
     if !query.is_empty() {
@@ -333,7 +333,7 @@ fn run(root: &Path, data: &Value, protect: &[String], loaded: bool) -> Result<Va
     let list = get(&url, "25")?;
     let items = list
         .as_array()
-        .ok_or("Hugging Face gaf een onbegrijpelijk antwoord")?;
+        .ok_or("Hugging Face returned an unreadable response")?;
     let mut seen: HashSet<String> = crate::models::catalog(root)?
         .iter()
         .filter_map(|entry| entry["id"].as_str().map(str::to_string))
@@ -372,14 +372,14 @@ fn run(root: &Path, data: &Value, protect: &[String], loaded: bool) -> Result<Va
     Ok(json!({"added":stored,"known":matched,"found":added+matched}))
 }
 /// Zoekt GGUF-modellen op Hugging Face en voegt nieuwe resultaten aan de bibliotheek toe.
-/// `loaded` is waar zolang er een lokaal model draait: dan blijft de rangschikking intact,
-/// zodat de poorten van actieve services niet verschuiven.
+/// `loaded` is true while a local model is running: preserve the ordering
+/// so active service ports do not shift.
 pub fn search(root: &Path, data: &Value, protect: &[String], loaded: bool) -> Result<Value> {
     if SEARCHING
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
     {
-        return Err("Er loopt al een zoekopdracht naar modellen".into());
+        return Err("A model search is already running".into());
     }
     let outcome = run(root, data, protect, loaded);
     SEARCHING.store(false, Ordering::SeqCst);
@@ -483,7 +483,7 @@ mod tests {
             assert!(["chat", "code", "reasoning", "vision"]
                 .contains(&entry["category"].as_str().unwrap()));
         }
-        // De bibliotheek maakt direct een service voor het winkelmodel.
+        // The library creates a service for the store model immediately.
         let mut cfg = json!({"paths":{"models":"models","llamafile":"runtime/llamafile.exe"},"services":{}});
         crate::models::extend_config(&root, &mut cfg).unwrap();
         let id = store[0]["id"].as_str().unwrap();
@@ -492,7 +492,7 @@ mod tests {
             .unwrap()
             .iter()
             .any(|arg| arg.as_str().unwrap_or("").ends_with(".gguf")));
-        // Opnieuw zoeken voegt geen dubbele modellen toe.
+        // Repeated searches do not add duplicate models.
         let again = search(&root, &json!({"query":"llama 3.2"}), &[], false).unwrap();
         assert_eq!(again["added"], 0);
         fs::remove_dir_all(&root).unwrap();

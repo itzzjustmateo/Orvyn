@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $script:UsbRoot = Split-Path $PSScriptRoot -Parent
 if (-not (Test-Path -LiteralPath (Join-Path $script:UsbRoot 'config\settings.json'))) {
-    throw 'USB-projectconfiguratie ontbreekt'
+    throw 'USB project configuration is missing'
 }
 $folders = @{
     TEMP = 'tools\temp'

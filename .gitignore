@@ -90,3 +90,18 @@
 **/services.lock
 **/Thumbs.db
 **/.DS_Store
+
+# Application license and release documentation
+!/LICENSE
+!/docs/RELEASE-NOTES-0.7.0.md
+
+# GitHub collaboration configuration
+!/.github/
+!/docs/GITHUB.md
+!/docs/ISSUE-BACKLOG.md
+
+# Detailed development guide
+!/docs/DEVELOPMENT.md
+
+# Application licensing guide
+!/docs/LICENSING.md

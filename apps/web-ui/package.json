@@ -33,5 +33,6 @@
     "esbuild": "^0.28.2",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "license": "SEE LICENSE IN ../../LICENSE"
 }

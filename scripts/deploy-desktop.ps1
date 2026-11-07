@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'usb-environment.ps1')
 $root=$script:UsbRoot
 $release=Join-Path $root 'apps\manager\build-usb\release'
-foreach($parent in @($root,$release,(Join-Path $root 'dist'),(Join-Path $root 'backups'))){if(-not(Test-Path -LiteralPath $parent)){throw "Map ontbreekt: $parent"}}
+foreach($parent in @($root,$release,(Join-Path $root 'dist'),(Join-Path $root 'backups'))){if(-not(Test-Path -LiteralPath $parent)){throw "Folder is missing: $parent"}}
 $exe=Join-Path $release 'ai-usb-manager.exe'
 $loader=Join-Path $release 'WebView2Loader.dll'
 if(-not(Test-Path -LiteralPath $exe)){throw 'Bouw eerst de desktopapp'}

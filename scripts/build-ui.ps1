@@ -5,4 +5,4 @@ $ui = Join-Path $script:UsbRoot 'apps\web-ui'
 $process = Start-Process -FilePath $node -ArgumentList 'build-desktop.mjs' -WorkingDirectory $ui -NoNewWindow -PassThru
 $handle = $process.Handle
 $process.WaitForExit()
-if ($process.ExitCode -ne 0) { throw 'UI-build mislukt' }
+if ($process.ExitCode -ne 0) { throw 'UI build failed' }

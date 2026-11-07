@@ -14,13 +14,13 @@ impl Startup {
         }
     }
     pub fn ready(&self,frontend:&Value){
-        self.mark("interface","Interface en gesprekken laden");
+        self.mark("interface","Loading interface and conversations");
         if let Ok(mut state)=self.state.lock(){state.complete=true;state.frontend=frontend.clone();}
     }
     pub fn snapshot(&self)->Value{
         let state=self.state.lock().unwrap();
         json!({"complete":state.complete,"total_ms":if state.complete{state.last}else{self.start.elapsed().as_millis() as u64},
             "phases":state.phases,"frontend":state.frontend,
-            "note":"Vanaf het starten van de desktopcode tot het invoerveld is getoond. Het laden van het executable door Windows valt buiten deze meting. Browserdetails overlappen met de fasen en worden niet opgeteld."})
+            "note":"Measured from desktop code startup until the input field appears. Windows executable loading is excluded. Browser timings overlap with the phases and are not added together."})
     }
 }

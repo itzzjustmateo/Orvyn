@@ -20,23 +20,23 @@ fn crypt(bytes:&[u8], protect:bool)->Result<Vec<u8>> {
         if protect {CryptProtectData(&input,std::ptr::null(),std::ptr::null(),std::ptr::null_mut(),std::ptr::null_mut(),1,&mut output)}
         else {CryptUnprotectData(&input,std::ptr::null_mut(),std::ptr::null(),std::ptr::null_mut(),std::ptr::null_mut(),1,&mut output)}
     };
-    if ok==0{return Err("API-sleutel niet toegankelijk. Voer de sleutel opnieuw in op dit Windows-account.".into());}
+    if ok==0{return Err("The API key is inaccessible. Enter it again using this Windows account.".into());}
     let result=unsafe{std::slice::from_raw_parts(output.data,output.len as usize).to_vec()};
     unsafe{LocalFree(output.data.cast());}
     Ok(result)
 }
 fn protect(key:&str)->Result<String>{Ok(base64::engine::general_purpose::STANDARD.encode(crypt(key.as_bytes(),true)?))}
 fn unprotect(value:&str)->Result<String>{
-    String::from_utf8(crypt(&base64::engine::general_purpose::STANDARD.decode(value).map_err(|_|"Ongeldige sleutelopslag")?,false)?).map_err(err)
+    String::from_utf8(crypt(&base64::engine::general_purpose::STANDARD.decode(value).map_err(|_|"Invalid key storage")?,false)?).map_err(err)
 }
 fn endpoint(kind:&str, custom:&str)->Result<String>{
     let base=match kind{"openai"=>"https://api.openai.com/v1","openrouter"=>"https://openrouter.ai/api/v1","compatible"=>custom.trim().trim_end_matches('/'),_=>return Err("Onbekende API-aanbieder".into())};
-    let parsed=url::Url::parse(base).map_err(|_|"Vul een geldige API-basis-URL in")?;
+    let parsed=url::Url::parse(base).map_err(|_|"Enter a valid API base URL")?;
     let loopback=matches!(parsed.host_str(),Some("localhost"|"127.0.0.1"|"[::1]"));
     if !(parsed.scheme()=="https"||(parsed.scheme()=="http"&&loopback))||parsed.host_str().is_none()||
         !parsed.username().is_empty()||parsed.password().is_some()||parsed.query().is_some()||parsed.fragment().is_some()||
         base.chars().any(|c|c.is_control()) {
-        return Err("Gebruik HTTPS zonder gebruikersnaam, wachtwoord, query of fragment. HTTP mag alleen op localhost.".into());
+        return Err("Use HTTPS without a username, password, query, or fragment. HTTP is allowed only on localhost.".into());
     }
     Ok(parsed.as_str().trim_end_matches('/').to_string())
 }
@@ -44,18 +44,18 @@ fn clean_error(data:&Value, key:&str, status:u16)->String {
     let message=data["error"]["message"].as_str().or_else(||data["error"].as_str()).unwrap_or(match status{
         401|403=>"Controleer je API-sleutel en toegangsrechten.",
         402=>"Onvoldoende API-tegoed bij de aanbieder.",
-        429=>"API-limiet bereikt. Probeer later opnieuw.",
-        _=>"De aanbieder gaf geen geldig antwoord.",
+        429=>"API rate limit reached. Try again later.",
+        _=>"The provider returned an invalid response.",
     });
     let message=if key.is_empty(){message.to_owned()}else{message.replace(key,"[sleutel verborgen]")};
-    format!("API-fout ({status}): {}",message.chars().take(500).collect::<String>())
+    format!("API error ({status}): {}",message.chars().take(500).collect::<String>())
 }
 pub fn validate_config(data:&Value)->Result<()>{
-    let entries=data["providers"].as_array().ok_or("Ongeldige API-configuratie")?;
+    let entries=data["providers"].as_array().ok_or("Invalid API configuration")?;
     let mut ids=std::collections::HashSet::new();
     for p in entries{
-        let id=p["id"].as_str().ok_or("Provider-id ontbreekt")?;
-        if !id.starts_with("api-")||!ids.insert(id)||p["model"].as_str().is_none_or(|s|s.is_empty())||!p["protected_key"].is_string(){return Err("Ongeldige API-configuratie".into());}
+        let id=p["id"].as_str().ok_or("Provider ID is missing")?;
+        if !id.starts_with("api-")||!ids.insert(id)||p["model"].as_str().is_none_or(|s|s.is_empty())||!p["protected_key"].is_string(){return Err("Invalid API configuration".into());}
         crate::custom_models::validate(p["name"].as_str().unwrap_or(""),p["category"].as_str().unwrap_or(""))?;
         endpoint(p["kind"].as_str().unwrap_or(""),p["base_url"].as_str().unwrap_or(""))?;
     }
@@ -76,7 +76,7 @@ impl Providers {
     pub fn catalog(&self)->Result<Value>{
         let entries=self.list()?;let mut result=json!({});
         for p in entries.as_array().unwrap(){
-            let id=p["id"].as_str().ok_or("Provider-id ontbreekt")?;
+            let id=p["id"].as_str().ok_or("Provider ID is missing")?;
             result[id]=json!({"name":p["name"],"type":if p["category"]=="vision"{"vision"}else{"chat"},"category":p["category"],
                 "description":format!("{} · {}",p["kind"].as_str().unwrap_or("API"),p["model"].as_str().unwrap_or("")),
                 "remote":true,"provider":p["kind"],"installed":true,"online":false,"status":"api","bytes":0,
@@ -88,19 +88,19 @@ impl Providers {
         let kind=data["kind"].as_str().unwrap_or("");
         let base=endpoint(kind,data["base_url"].as_str().unwrap_or(""))?;
         let old=if let Some(id)=data["id"].as_str().filter(|s|!s.is_empty()){
-            Some(self.entries()?.into_iter().find(|p|p["id"]==id).ok_or("API-verbinding bestaat niet meer")?)
+            Some(self.entries()?.into_iter().find(|p|p["id"]==id).ok_or("This API connection no longer exists")?)
         }else{None};
         let name=data["name"].as_str().unwrap_or("").trim();
         let model=data["model"].as_str().unwrap_or("").trim();
         let category=data["category"].as_str().unwrap_or("chat");
         if require_model {
             crate::custom_models::validate(name,category)?;
-            if model.is_empty()||model.len()>200||model.chars().any(|c|c.is_control()){return Err("Vul een geldig model-ID van de aanbieder in".into());}
+            if model.is_empty()||model.len()>200||model.chars().any(|c|c.is_control()){return Err("Enter a valid provider model ID".into());}
         }
         let supplied=data["api_key"].as_str().unwrap_or("").trim();
-        if supplied.len()>4096||supplied.chars().any(|c|c.is_control()){return Err("Ongeldige API-sleutel".into());}
+        if supplied.len()>4096||supplied.chars().any(|c|c.is_control()){return Err("Invalid API key".into());}
         let key=if !supplied.is_empty(){supplied.to_string()}else if let Some(ref p)=old{
-            if p["base_url"]!=base||p["kind"]!=kind{return Err("Voer bij een andere aanbieder of URL opnieuw de API-sleutel in.".into());}
+            if p["base_url"]!=base||p["kind"]!=kind{return Err("Enter the API key again when changing the provider or URL.".into());}
             p["protected_key"].as_str().filter(|k|!k.is_empty()).map(unprotect).transpose()?.unwrap_or_default()
         }else{String::new()};
         if key.is_empty()&&kind!="compatible"{return Err("Vul je API-sleutel in".into());}
@@ -118,27 +118,27 @@ impl Providers {
     }
     pub fn remove(&self,data:&Value)->Result<Value>{
         let _guard=self.settings.lock().map_err(err)?;
-        let id=data["id"].as_str().ok_or("Provider-id ontbreekt")?;
+        let id=data["id"].as_str().ok_or("Provider ID is missing")?;
         let mut entries=self.entries()?;entries.retain(|p|p["id"]!=id);
         core::atomic(&self.file(),&json!({"version":1,"providers":entries}))?;Ok(json!({"ok":true}))
     }
     pub fn cancel(&self){self.cancelled.store(true,Ordering::SeqCst);}
     pub fn models(&self,data:&Value)->Result<Value>{
-        let _guard=self.request.try_lock().map_err(|_|"Er loopt al een API-aanvraag")?;
+        let _guard=self.request.try_lock().map_err(|_|"An API request is already running")?;
         self.cancelled.store(false,Ordering::SeqCst);
         let (entry,key)={let _settings=self.settings.lock().map_err(err)?;self.prepare(data,false)?};
         let result=self.transport(&entry,&key,"models",None,false,|_|Ok(()))?;
-        let models=result["data"].as_array().ok_or("Deze API ondersteunt geen modellenlijst; vul het model-ID handmatig in.")?;
+        let models=result["data"].as_array().ok_or("This API does not support listing models; enter the model ID manually.")?;
         let mut ids:Vec<&str>=models.iter().filter_map(|m|m["id"].as_str()).collect();ids.sort_unstable();ids.dedup();Ok(json!({"models":ids}))
     }
     pub fn chat(&self,id:&str,body:Value,stream:bool,emit:impl FnMut(String)->Result<()>)->Result<Value>{
-        let _guard=self.request.try_lock().map_err(|_|"Er loopt al een API-aanvraag")?;
+        let _guard=self.request.try_lock().map_err(|_|"An API request is already running")?;
         self.cancelled.store(false,Ordering::SeqCst);
-        let entry={let _settings=self.settings.lock().map_err(err)?;self.entries()?.into_iter().find(|p|p["id"]==id).ok_or("API-model bestaat niet meer; kies een ander model")?};
+        let entry={let _settings=self.settings.lock().map_err(err)?;self.entries()?.into_iter().find(|p|p["id"]==id).ok_or("This API model is no longer available; choose another model")?};
         // Validate persisted endpoints too, before sending credentials.
         let mut entry=entry;entry["base_url"]=json!(endpoint(entry["kind"].as_str().unwrap_or(""),entry["base_url"].as_str().unwrap_or(""))?);
         let key=entry["protected_key"].as_str().filter(|s|!s.is_empty()).map(unprotect).transpose()?.unwrap_or_default();
-        let messages=body["messages"].as_array().ok_or("Berichten ontbreken")?;
+        let messages=body["messages"].as_array().ok_or("Messages are missing")?;
         let mut request=json!({"model":entry["model"],"messages":messages,"stream":stream});
         if let Some(limit)=body["max_tokens"].as_u64(){
             request[if entry["kind"]=="openai"{"max_completion_tokens"}else{"max_tokens"}]=json!(limit.clamp(1,32768));
@@ -148,27 +148,27 @@ impl Providers {
         self.transport(&entry,&key,"chat/completions",Some(request),stream,emit)
     }
     fn transport(&self,entry:&Value,key:&str,path:&str,body:Option<Value>,stream:bool,mut emit:impl FnMut(String)->Result<()>)->Result<Value>{
-        let url=format!("{}/{}",entry["base_url"].as_str().ok_or("API-URL ontbreekt")?,path);
+        let url=format!("{}/{}",entry["base_url"].as_str().ok_or("API URL is missing")?,path);
         // Config arrives over stdin: secrets and chat contents never enter command arguments or temp files.
         let mut config=format!("url = {}\nheader = \"Content-Type: application/json\"\n",serde_json::to_string(&url).map_err(err)?);
         if !key.is_empty(){config.push_str(&format!("header = {}\n",serde_json::to_string(&format!("Authorization: Bearer {key}")).map_err(err)?));}
         if let Some(body)=body{config.push_str(&format!("data-binary = {}\n",serde_json::to_string(&body.to_string()).map_err(err)?));}
         let mut child=core::hidden("curl.exe").args(["-q","--silent","--no-buffer","--include","--suppress-connect-headers","--globoff","--connect-timeout","15","--max-time","300","--config","-"])
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(err)?;
-        let stdout=child.stdout.take().ok_or("API-uitvoer ontbreekt")?;
+        let stdout=child.stdout.take().ok_or("API output is missing")?;
         let (tx,rx)=mpsc::sync_channel(8);
         let reader=std::thread::spawn(move||{
             let mut stdout=stdout;let mut buffer=[0;8192];
             loop{match stdout.read(&mut buffer){Ok(0)=>break,Ok(n)=>if tx.send(Ok(buffer[..n].to_vec())).is_err(){break;},Err(_)=>{let _=tx.send(Err("API-verbinding onderbroken".to_string()));break;}}}
         });
         let result=(||->Result<Value>{
-            child.stdin.take().ok_or("API-invoer ontbreekt")?.write_all(config.as_bytes()).map_err(err)?;
+            child.stdin.take().ok_or("API input is missing")?.write_all(config.as_bytes()).map_err(err)?;
             let mut pending=Vec::new();let mut raw=Vec::new();let mut headers=true;let mut status=0u16;
             let mut content=String::new();let mut usage=Value::Null;let mut total=0usize;let mut done=false;
             loop{
-                if self.cancelled.load(Ordering::SeqCst){return Err("API-aanvraag gestopt".into());}
+                if self.cancelled.load(Ordering::SeqCst){return Err("API request stopped".into());}
                 match rx.recv_timeout(Duration::from_millis(100)){
-                    Ok(bytes)=>{let bytes=bytes?;total+=bytes.len();if total>40_000_000{return Err("API-antwoord te groot".into());}pending.extend(bytes);}
+                    Ok(bytes)=>{let bytes=bytes?;total+=bytes.len();if total>40_000_000{return Err("API-answer te groot".into());}pending.extend(bytes);}
                     Err(mpsc::RecvTimeoutError::Timeout)=>continue,
                     Err(mpsc::RecvTimeoutError::Disconnected)=>break,
                 }
@@ -181,11 +181,11 @@ impl Providers {
                         continue;
                     }
                     if stream&&(200..300).contains(&status){
-                        let line=std::str::from_utf8(&line).map_err(|_|"Ongeldige UTF-8 in API-stream")?;
+                        let line=std::str::from_utf8(&line).map_err(|_|"Invalid UTF-8 in API stream")?;
                         if let Some(data)=line.trim_end().strip_prefix("data:"){
                             let data=data.trim();if data=="[DONE]"{done=true;break;}
                             if data.is_empty(){continue;}
-                            let chunk:Value=serde_json::from_str(data).map_err(|_|"Ongeldige API-stream")?;
+                            let chunk:Value=serde_json::from_str(data).map_err(|_|"Invalid API stream")?;
                             if !chunk["error"].is_null(){return Err(clean_error(&chunk,key,status));}
                             if let Some(text)=chunk["choices"][0]["delta"]["content"].as_str(){content.push_str(text);}
                             if !chunk["usage"].is_null(){usage=chunk["usage"].clone();}
@@ -201,11 +201,11 @@ impl Providers {
                 return Err(clean_error(&serde_json::from_slice(&raw).unwrap_or(Value::Null),key,status));
             }
             if stream{
-                if !done{return Err("API-stream onderbroken; antwoord mogelijk onvolledig.".into());}
+                if !done{return Err("API-stream onderbroken; answer mogelijk onvolledig.".into());}
                 Ok(json!({"choices":[{"message":{"content":content}}],"usage":usage}))
             }else{
                 raw.extend(pending);
-                let value:Value=serde_json::from_slice(&raw).map_err(|_|"Aanbieder gaf geen geldig JSON-antwoord")?;
+                let value:Value=serde_json::from_slice(&raw).map_err(|_|"The provider returned an invalid JSON response")?;
                 if !value["error"].is_null(){return Err(clean_error(&value,key,status));}Ok(value)
             }
         })();
@@ -296,6 +296,6 @@ mod tests {
         let client=p.clone();let thread=std::thread::spawn(move||client.chat(&id,json!({"messages":[]}),true,|_|Ok(())));
         let request=server.recv_timeout(Duration::from_secs(10)).unwrap().unwrap();
         let start=std::time::Instant::now();p.cancel();let error=thread.join().unwrap().unwrap_err();
-        assert!(error.contains("gestopt"));assert!(start.elapsed()<Duration::from_secs(3));drop(request);fs::remove_dir_all(root).unwrap();
+        assert!(error.contains("stopped"));assert!(start.elapsed()<Duration::from_secs(3));drop(request);fs::remove_dir_all(root).unwrap();
     }
 }

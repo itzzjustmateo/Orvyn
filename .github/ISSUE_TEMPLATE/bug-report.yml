@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible problem in Orvyn.
+title: '[Bug] '
+body:
+  - type: markdown
+    attributes:
+      value: Please remove API keys, private conversations, and personal file paths from logs or screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Orvyn version
+      placeholder: 0.7.0 or a source commit
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Installation type
+      options:
+        - Installer with Orvyn 1
+        - Installer without Orvyn 1
+        - Portable folder
+        - Source build
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Windows version and hardware
+      description: Include CPU, RAM, and WebView2 version if relevant.
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model or API provider
+      description: Include the model ID and quantization when relevant. Never include API keys.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant redacted output or attach a screenshot. For CI failures, include the workflow run URL.

@@ -1,6 +1,6 @@
 import { chromium, expect } from '../apps/web-ui/node_modules/@playwright/test/index.mjs';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import JSZip from '../apps/web-ui/node_modules/jszip/lib/index.js';
@@ -19,6 +19,7 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'msedge',headless:true});
+let projectFixtureRoot;
 try{
   const page=await browser.newPage({viewport:{width:1400,height:1000}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -37,23 +38,23 @@ try{
     }else if(path==='/api/index/scan'){expect(request.method()).toBe('POST');expect(body).toEqual({});data={folders:[],files:[]};}
     else if(path==='/api/catalog')data={models,runtime:{active:null,phase:'idle',idle_seconds:1800},download:{status:'idle'},selection:{},queue,queue_paused:false};
     else if(path==='/api/hardware')data={ram_bytes:16e9,available_bytes:10e9,cpu:'Test CPU',threads:8,model_ram_bytes:2e9};
-    else if(path==='/api/diagnostics/startup')data={complete:true,total_ms:3100,phases:[{id:'configuration',label:'Configuratie lezen',duration_ms:100},{id:'interface',label:'Interface en gesprekken laden',duration_ms:3000}],note:'Browserdetails overlappen met de fasen.',frontend:{storage_ms:120,dom_ms:220,resources:[{path:'/app.js',duration_ms:140}]}};
+    else if(path==='/api/diagnostics/startup')data={complete:true,total_ms:3100,phases:[{id:'configuration',label:'Reading configuration',duration_ms:100},{id:'interface',label:'Loading interface and conversations',duration_ms:3000}],note:'Browserdetails overlappen met de fasen.',frontend:{storage_ms:120,dom_ms:220,resources:[{path:'/app.js',duration_ms:140}]}};
     else if(path==='/api/training')data={candidates:[candidate],command:'python train_orvyn.py --train',progress:{phase:'completed',step:24,total_steps:24,updated_at:1793380000},dataset:{version:'v2',counts:{train:{nl:28,code:28,web:28,pc:28},eval:{nl:12,code:12,web:12,pc:12}},issues:[]}};
     else if(path==='/api/training/candidate'){expect(body.id).toBe(candidate.id);data=candidate;}
-    else if(path==='/api/training/examples')data={examples:[{id:'example-'+body.domain,origin:'Synthetisch voorbeeld',messages:[{role:'system',content:'Geef een geldige actie.'},{role:'user',content:'Lees README.md.'},{role:'assistant',content:'{"action":"read","path":"README.md"}'}]}]};
+    else if(path==='/api/training/examples')data={examples:[{id:'example-'+body.domain,origin:'Synthetisch voorbeeld',messages:[{role:'system',content:'Provide a geldige actie.'},{role:'user',content:'Lees README.md.'},{role:'assistant',content:'{"action":"read","path":"README.md"}'}]}]};
     else if(path==='/api/chat'||path==='/api/chat-stream'){
       calls.push(body);const prompt=String(body.messages.at(-1).content);if(prompt.includes('LIVE_TEST')){await route.fallback();return;}
       await new Promise(r=>setTimeout(r,100));let content=Array.isArray(body.messages.at(-1).content)?'Wereldoorlog OCR_TEST':`Antwoord van ${body.model}: 1939–1945.`;
       if(prompt.includes('Opex. '))content=JSON.stringify({action:'run',command:'Write-Output OPEX_UI_OK'});
       if(prompt.includes('OPEX_INVALID_TEST'))content=JSON.stringify({action:'run',command:'Write-Output SHOULD_NOT_RUN',approved:true});
-      if(prompt.includes('OPEX CODEWERKRUIMTE'))content=String.fromCharCode(96).repeat(3)+'python\n# OPEX_CHANGED\nprint(42)\n'+String.fromCharCode(96).repeat(3);
-      if(prompt.includes('Haal concrete afspraken'))content='["Afspraak vanuit het gesprek"]';
-      if(prompt.includes('Geef uitsluitend de concrete actiepunten'))content='["Jan maakt het verslag dinsdag"]';
-      if(prompt.includes('Geef alleen de nieuwe tekst'))content='Een verbeterde tekst.';
-      if(prompt.includes('Vertaal de volgende tekst'))content='Hello there.';
-      if(prompt.includes('Verwerk dit vergadertranscript'))content='Samenvatting: overleg.\nBesluiten: verslag maken.\nActiepunten: Jan maakt het verslag dinsdag.';
-      if(prompt.includes('Maak 5 oefenvragen'))content='[{"question":"Wanneer begon de oorlog?","answer":"1939"}]';
-      if(prompt.includes('Beoordeel dit oefenantwoord'))content='Goed: 1939 is het juiste jaartal.';
+      if(prompt.includes('OPEX CODE WORKSPACE'))content=String.fromCharCode(96).repeat(3)+'python\n# OPEX_CHANGED\nprint(42)\n'+String.fromCharCode(96).repeat(3);
+      if(prompt.includes('Extract concrete commitments'))content='["Afspraak vanuit het gesprek"]';
+      if(prompt.includes('Return only concrete action items'))content='["Jan maakt het verslag dinsdag"]';
+      if(prompt.includes('Return only the updated text'))content='Een verbeterde tekst.';
+      if(prompt.includes('Translate the following text'))content='Hello there.';
+      if(prompt.includes('Process this meeting transcript'))content='Samenvatting: overleg.\nBesluiten: verslag maken.\nActiepunten: Jan maakt het verslag dinsdag.';
+      if(prompt.includes('Create 5 practice questions'))content='[{"question":"Wanneer begon de oorlog?","answer":"1939"}]';
+      if(prompt.includes('Assess this practice answer'))content='Goed: 1939 is het juiste jaartal.';
       data={choices:[{message:{content}}],usage:{completion_tokens:30}};
     }
     else if(path==='/api/providers'){
@@ -70,7 +71,7 @@ try{
     else if(path==='/api/providers/remove'){providers=providers.filter(p=>p.id!==body.id);delete models[body.id];}
     else if(path==='/api/web-read'){expect(body.url).toBe('https://example.com');data={name:'example.com',url:body.url,text:'WEB_PAGE_MARKER: Example Domain is a documentation example.'};}
     else if(path==='/api/opex/action'){pcActions.push(body);data=body.action==='list'?{files:[]}:{exit_code:0,output:'OPEX_UI_OK'};}
-    else if(path==='/api/opex/validate'){if(body.proposal.approved!==undefined){await route.fulfill({status:400,json:{error:'Voorstel bevat onverwachte goedkeuring.',valid:false}});return;}data={valid:true,proposal:body.proposal};}
+    else if(path==='/api/opex/validate'){if(body.proposal.approved!==undefined){await route.fulfill({status:400,json:{error:'Proposal bevat onverwachte goedkeuring.',valid:false}});return;}data={valid:true,proposal:body.proposal};}
     else if(path==='/api/opex/export'){expect(body.name).toBe('example.py');expect(body.text).toContain('OPEX_CHANGED');data={path:'data/exports/opex-test/example.py'};}
     else if(path==='/api/backup')data={path:'backups/orvyn-test.zip'};
     else if(path==='/api/export'){exports.push(body);data={path:'data/exports/test.pdf'};}
@@ -117,8 +118,8 @@ try{
   await page.getByRole('button',{name:'Tools & preferences'}).click();
   const pdf=makePdf('De Tweede Wereldoorlog was van 1939 tot 1945.');
   await page.locator('input[type=file][accept^=".pdf"]').setInputFiles({name:'historie.pdf',mimeType:'application/pdf',buffer:pdf});
-  await expect(page.getByText('1 document(en) opgeslagen.')).toBeVisible({timeout:30000});
-  expect(documents[0].text).toContain('Pagina 1');
+  await expect(page.getByText('1 document(s) saved.')).toBeVisible({timeout:30000});
+  expect(documents[0].text).toContain('Page 1');
   const zip=new JSZip();zip.file('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');zip.file('_rels/.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');zip.file('word/document.xml','<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Wereldoorlog DOCX_TEST</w:t></w:r></w:p></w:body></w:document>');
   await page.locator('input[type=file][accept^=".pdf"]').setInputFiles({name:'historie.docx',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',buffer:await zip.generateAsync({type:'nodebuffer'})});
   await expect.poll(()=>documents.length,{timeout:30000}).toBe(2);expect(documents[1].text).toContain('DOCX_TEST');
@@ -143,8 +144,13 @@ try{
   await page.getByLabel('Search conversations').fill('');
   await page.getByRole('button',{name:'Workspace',exact:true}).click();
   await page.getByRole('button',{name:'Project',exact:true}).click();
-  // Folder upload traverses the USB filesystem; cold reads may exceed 30 seconds.
-  await page.getByLabel('Choose project folder').setInputFiles(resolve(root,'tests/fixtures/project-context'),{timeout:90000});
+  // Create the upload fixture from source so clean checkouts need no ignored files.
+  projectFixtureRoot=await mkdtemp(resolve(root,'tests/workspace-fixtures-'));
+  const projectDirectory=resolve(projectFixtureRoot,'project-context');
+  await mkdir(projectDirectory);
+  await writeFile(resolve(projectDirectory,'example.py'),'PROJECT_CONTEXT_MARKER = "workspace UI fixture"\n\ndef greet(name: str) -> str:\n    return f"Hello, {name}!"\n','utf8');
+  // Folder upload traverses the filesystem; cold reads may exceed 30 seconds.
+  await page.getByLabel('Choose project folder').setInputFiles(projectDirectory,{timeout:90000});
   await page.getByLabel(/project-context\/example.py/).check();
   await expect.poll(()=>state.workbench?.project?.[0]?.selected).toBe(true);
   await page.getByRole('complementary',{name:'Workspace'}).getByRole('button',{name:'Opex',exact:true}).click();
@@ -171,59 +177,59 @@ try{
   await page.getByRole('button',{name:'Apply to working copy'}).click();
   await expect.poll(()=>state.workbench.project[0].text).toContain('OPEX_CHANGED');
   await page.getByRole('button',{name:'Export working copy'}).click();
-  await expect(page.getByText('Kopie op USB opgeslagen:',{exact:false})).toBeVisible();
+  await expect(page.getByText('Copy saved to USB:',{exact:false})).toBeVisible();
   await page.getByRole('button',{name:'Undo last change'}).click();
   await expect.poll(()=>state.workbench.project[0].text).toContain('PROJECT_CONTEXT_MARKER');
   await page.getByRole('button',{name:'Diff',exact:true}).click();
-  await page.getByLabel('Originele code').fill('console.log(1);');
-  await page.getByLabel('Nieuwe code').fill('console.log(2 + 3);');
+  await page.getByLabel('Original code').fill('console.log(1);');
+  await page.getByLabel('New code').fill('console.log(2 + 3);');
   await expect(page.getByLabel('Diff')).toContainText('+ console.log(2 + 3);');
   await page.getByRole('button',{name:'Run JavaScript'}).click();
   await expect(page.locator('pre[role=status]')).toContainText('5',{timeout:35000});
   await expect(page.locator('code span[style]').first()).toBeVisible();
-  await page.getByLabel('Nieuwe code').fill('console.log([typeof fetch, typeof window, typeof require, typeof process].join("|"));');
+  await page.getByLabel('New code').fill('console.log([typeof fetch, typeof window, typeof require, typeof process].join("|"));');
   await page.getByRole('button',{name:'Run JavaScript'}).click();
   await expect(page.locator('pre[role=status]')).toContainText('undefined|undefined|undefined|undefined',{timeout:35000});
-  await page.getByLabel('Nieuwe code').fill('while (true) {}');
+  await page.getByLabel('New code').fill('while (true) {}');
   await page.getByRole('button',{name:'Run JavaScript'}).click();
   await expect(page.locator('pre[role=status]')).toContainText(/interrupted|tijdslimiet/i,{timeout:35000});
   await page.getByRole('button',{name:'Tasks',exact:true}).click();
   await page.getByLabel('New task').fill('Een concrete afspraak');
-  await page.getByRole('button',{name:'Toevoegen',exact:true}).click();
-  await page.getByLabel('Taak voltooid: Een concrete afspraak').check();
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await page.getByLabel('Task completed: Een concrete afspraak').check();
   await expect.poll(()=>state.workbench?.tasks[0]?.done).toBe(true);
-  await page.getByRole('button',{name:'Tasks uit gesprek halen'}).click();
+  await page.getByRole('button',{name:'Extract tasks from conversation'}).click();
   await expect(page.getByText('Afspraak vanuit het gesprek',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Writing',exact:true}).click();
-  await page.getByLabel('Schrijftekst').fill('Ruwe tekst');
-  await page.getByRole('button',{name:'AI-voorstel maken'}).click();
-  await expect(page.getByLabel('Schrijfvoorstel')).toHaveValue('Een verbeterde tekst.');
-  await expect(page.getByLabel('Schrijftekst')).toHaveValue('Ruwe tekst');
-  await page.getByRole('button',{name:'Voorstel overnemen'}).click();
-  await expect(page.getByLabel('Schrijftekst')).toHaveValue('Een verbeterde tekst.');
+  await page.getByLabel('Writing text').fill('Ruwe tekst');
+  await page.getByRole('button',{name:'Generate AI proposal'}).click();
+  await expect(page.getByLabel('Writing proposal')).toHaveValue('Een verbeterde tekst.');
+  await expect(page.getByLabel('Writing text')).toHaveValue('Ruwe tekst');
+  await page.getByRole('button',{name:'Accept proposal'}).click();
+  await expect(page.getByLabel('Writing text')).toHaveValue('Een verbeterde tekst.');
   await page.getByRole('button',{name:'Translate',exact:true}).click();
-  await page.getByLabel('Vertaalbron').fill('Hallo daar');
+  await page.getByLabel('Translation source').fill('Hallo daar');
   await page.getByRole('button',{name:'Translate',exact:true}).last().click();
-  await expect(page.getByLabel('Vertaling',{exact:true})).toHaveValue('Hello there.');
+  await expect(page.getByLabel('Translation',{exact:true})).toHaveValue('Hello there.');
   await page.getByRole('button',{name:'Meeting',exact:true}).click();
-  await page.getByLabel('Vergadertranscript').fill('Jan maakt het verslag dinsdag.');
-  await page.getByRole('button',{name:'Notities verwerken'}).click();
-  await expect(page.getByLabel('Vergadernotities')).toHaveValue(/Actiepunten/);
-  await page.getByRole('button',{name:'Actiepunten als taken'}).click();
+  await page.getByLabel('Meeting transcript').fill('Jan maakt het verslag dinsdag.');
+  await page.getByRole('button',{name:'Process notes'}).click();
+  await expect(page.getByLabel('Meeting notes')).toHaveValue(/Actiepunten/);
+  await page.getByRole('button',{name:'Create tasks from action items'}).click();
   await expect(page.getByText('Jan maakt het verslag dinsdag',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Learn',exact:true}).click();
-  await page.getByLabel('Lesmateriaal').fill('De oorlog begon in 1939.');
-  await page.getByRole('button',{name:'Flashcards / oefentoets maken'}).click();
-  await page.getByLabel('Oefenantwoord 1').fill('1939');
-  await page.getByRole('button',{name:'Antwoord beoordelen'}).click();
+  await page.getByLabel('Study material').fill('De oorlog begon in 1939.');
+  await page.getByRole('button',{name:'Create flashcards / practice quiz'}).click();
+  await page.getByLabel('Practice answer 1').fill('1939');
+  await page.getByRole('button',{name:'Assess answer'}).click();
   await expect(page.getByText('Goed: 1939 is het juiste jaartal.',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Library',exact:true}).click();
-  await page.getByLabel('Sjabloonnaam').fill('Mijn profiel');
-  await page.getByLabel('Sjabloontekst').fill('Usage korte zinnen.');
-  await page.getByRole('button',{name:'Profiel bewaren'}).click();
-  await page.getByLabel('Assistentprofiel').selectOption({label:'Mijn profiel'});
-  await page.getByRole('button',{name:'Prompt bewaren'}).click();
-  await page.getByRole('button',{name:'Mijn profiel gebruiken'}).click();
+  await page.getByLabel('Template name').fill('Mijn profiel');
+  await page.getByLabel('Template text').fill('Usage korte zinnen.');
+  await page.getByRole('button',{name:'Save profile'}).click();
+  await page.getByLabel('Assistant profile').selectOption({label:'Mijn profiel'});
+  await page.getByRole('button',{name:'Save prompt'}).click();
+  await page.getByRole('button',{name:'Mijn profiel use'}).click();
   await expect(page.getByRole('textbox',{name:'Chat message'})).toHaveValue('Usage korte zinnen.');
   await page.getByRole('button',{name:'Close workspace'}).click();
   await page.getByRole('textbox',{name:'Chat message'}).fill('LIVE_TEST');
@@ -296,7 +302,7 @@ try{
   const settings=page.getByRole('dialog',{name:'Orvyn · Settings'});
   await settings.getByRole('button',{name:'Startup',exact:true}).click();
   await expect(settings.getByText('Where does startup time go?')).toBeVisible({timeout:60000});
-  await expect(settings.getByText('3,1 s',{exact:true})).toBeVisible();
+  await expect(settings.getByText('3.1 s',{exact:true})).toBeVisible();
   await settings.screenshot({path:resolve(root,'tests/orvyn-startup-diagnostics.png')});
   await settings.getByRole('button',{name:'Training',exact:true}).click();
   await expect(settings.getByText('112',{exact:true})).toBeVisible({timeout:60000});
@@ -369,8 +375,14 @@ try{
   await page.getByRole('button',{name:'Tools & preferences',exact:true}).click();
 
   expect(errors).toEqual([]);
-  console.log('UI-integratie geslaagd, inclusief echte SSE-fragmenten, codekleuren, QuickJS-isolatie/tijdslimiet, verschillen, taken, vertakken, pins en tijdelijke opslag.');
-}finally{await browser.close();await new Promise(r=>{server.close(r);server.closeAllConnections();});}
+  console.log('UI integration passed, including real SSE chunks, syntax highlighting, QuickJS isolation/time limits, diffs, tasks, branching, pins, and temporary storage.');
+}finally{
+  try{await browser.close();}finally{
+    try{await new Promise(r=>{server.close(r);server.closeAllConnections();});}finally{
+      if(projectFixtureRoot)await rm(projectFixtureRoot,{recursive:true,force:true});
+    }
+  }
+}
 
 function makePdf(text){
   const stream=`BT /F1 12 Tf 40 700 Td (${text}) Tj ET`;

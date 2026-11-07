@@ -23,13 +23,13 @@ export async function GET() {
   try {
     return NextResponse.json(await load(await filename()));
   } catch {
-    return NextResponse.json({ error: "Gesprekken lezen mislukt" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to read conversations" }, { status: 500 });
   }
 }
 export async function PUT(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (origin && new URL(origin).host !== request.headers.get("host")) {
-    return NextResponse.json({ error: "Ongeldige oorsprong" }, { status: 403 });
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
   }
   try {
     const text = await request.text();
@@ -37,14 +37,14 @@ export async function PUT(request: NextRequest) {
     const state = JSON.parse(text);
     if (!Array.isArray(state.chats) || !state.chats.every((c: {id?: unknown; messages?: unknown}) =>
       typeof c.id === "string" && Array.isArray(c.messages))) {
-      return NextResponse.json({ error: "Ongeldige gesprekken" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid conversations" }, { status: 400 });
     }
     let result = NextResponse.json({});
     const operation = writes.then(async () => {
       const file = await filename();
       const current = await load(file);
       if ((current?.revision ?? null) !== (state.revision ?? null)) {
-        result = NextResponse.json({ error: "Gesprekken zijn elders gewijzigd of hersteld. Herlaad deze pagina." }, { status: 409 });
+        result = NextResponse.json({ error: "Conversations changed or were restored elsewhere. Reload this page." }, { status: 409 });
         return;
       }
       const revision = randomUUID();
@@ -62,6 +62,6 @@ export async function PUT(request: NextRequest) {
     await operation;
     return result;
   } catch {
-    return NextResponse.json({ error: "Gesprekken opslaan mislukt" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save conversations" }, { status: 500 });
   }
 }
