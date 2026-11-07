@@ -30,7 +30,15 @@ fn unprotect(value:&str)->Result<String>{
     String::from_utf8(crypt(&base64::engine::general_purpose::STANDARD.decode(value).map_err(|_|"Invalid key storage")?,false)?).map_err(err)
 }
 fn endpoint(kind:&str, custom:&str)->Result<String>{
-    let base=match kind{"openai"=>"https://api.openai.com/v1","openrouter"=>"https://openrouter.ai/api/v1","compatible"=>custom.trim().trim_end_matches('/'),_=>return Err("Onbekende API-aanbieder".into())};
+    let base = match kind {
+        "openai" => "https://api.openai.com/v1",
+        "openrouter" => "https://openrouter.ai/api/v1",
+        "groq" => "https://api.groq.com/openai/v1",
+        "deepseek" => "https://api.deepseek.com",
+        "mistral" => "https://api.mistral.ai/v1",
+        "compatible" => custom.trim().trim_end_matches('/'),
+        _ => return Err("Unknown API provider".into()),
+    };
     let parsed=url::Url::parse(base).map_err(|_|"Enter a valid API base URL")?;
     let loopback=matches!(parsed.host_str(),Some("localhost"|"127.0.0.1"|"[::1]"));
     if !(parsed.scheme()=="https"||(parsed.scheme()=="http"&&loopback))||parsed.host_str().is_none()||
@@ -103,7 +111,7 @@ impl Providers {
             if p["base_url"]!=base||p["kind"]!=kind{return Err("Enter the API key again when changing the provider or URL.".into());}
             p["protected_key"].as_str().filter(|k|!k.is_empty()).map(unprotect).transpose()?.unwrap_or_default()
         }else{String::new()};
-        if key.is_empty()&&kind!="compatible"{return Err("Vul je API-sleutel in".into());}
+        if key.is_empty()&&kind!="compatible"{return Err("Enter your API key".into());}
         let id=old.as_ref().and_then(|p|p["id"].as_str()).map(str::to_string).unwrap_or_else(||format!("api-{}",core::id()));
         Ok((json!({"id":id,"kind":kind,"base_url":base,"name":name,"model":model,"category":category}),key))
     }
@@ -144,7 +152,7 @@ impl Providers {
             request[if entry["kind"]=="openai"{"max_completion_tokens"}else{"max_tokens"}]=json!(limit.clamp(1,32768));
         }
         if entry["kind"]=="openai"{request["store"]=json!(false);}
-        if stream{request["stream_options"]=json!({"include_usage":true});}
+        if stream && matches!(entry["kind"].as_str(), Some("openai" | "openrouter" | "compatible")){request["stream_options"]=json!({"include_usage":true});}
         self.transport(&entry,&key,"chat/completions",Some(request),stream,emit)
     }
     fn transport(&self,entry:&Value,key:&str,path:&str,body:Option<Value>,stream:bool,mut emit:impl FnMut(String)->Result<()>)->Result<Value>{
@@ -251,6 +259,13 @@ mod tests {
         assert!(endpoint("compatible","http://127.0.0.1:1234/v1").is_ok());
         assert_eq!(endpoint("openai","https://wrong.example").unwrap(),"https://api.openai.com/v1");
         assert_eq!(endpoint("openrouter","").unwrap(),"https://openrouter.ai/api/v1");
+        for (kind, expected) in [
+            ("groq", "https://api.groq.com/openai/v1"),
+            ("deepseek", "https://api.deepseek.com"),
+            ("mistral", "https://api.mistral.ai/v1"),
+        ] {
+            assert_eq!(endpoint(kind, "https://wrong.example").unwrap(), expected);
+        }
     }
     #[test]fn api_stream_and_json_preserve_model_messages_and_usage(){
         for stream in [true,false]{

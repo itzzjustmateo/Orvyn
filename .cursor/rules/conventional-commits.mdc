@@ -1,0 +1,29 @@
+---
+description: Use Conventional Commits for all new Orvyn commits
+alwaysApply: true
+---
+
+# Commit messages
+
+Use `type: summary` or `type(scope): summary`. Choose the type that describes the main change. Keep the summary short and use an imperative verb.
+
+- `feat` for a new capability
+- `fix` for a bug fix
+- `ci` for continuous integration and workflow changes
+- `docs` for documentation
+- `build` for build tooling or dependencies
+- `refactor` for code restructuring that preserves behavior
+- `perf` for performance improvements
+- `test` for test changes
+- `style` for code formatting
+- `chore` for routine maintenance
+- `revert` for reverting a commit
+
+Use `!` before the colon or a `BREAKING CHANGE:` footer for a breaking change.
+
+```text
+feat: add model download progress
+fix(workspace): generate upload fixtures during tests
+ci: run native tests on Windows
+docs: update installer instructions
+```
