@@ -2,16 +2,18 @@
 
 ## Continuous integration
 
-The `CI` workflow runs on pushes to `main`, pull requests, and manual dispatches. It has two independent Windows Server 2022 jobs:
+The `CI` workflow runs on pushes to `main`, pull requests, and manual dispatches. It has four independent jobs:
 
-- **Web build and browser tests:** installs locked npm dependencies, checks TypeScript, builds the desktop web bundle, tests streaming, and runs the workspace and Opex Work suites in the runner's Microsoft Edge.
-- **Windows native tests and build:** selects Rust 1.97.1 MSVC, initializes clean portable configuration, restores locked Cargo dependencies, and runs native tests and the desktop release build offline.
+- **Windows web build and browser tests:** on Windows Server 2022, installs locked npm dependencies, checks TypeScript, builds the desktop web bundle, tests streaming, and runs the workspace and Opex Work suites in the runner's Microsoft Edge.
+- **Windows native tests and build:** on Windows Server 2022, selects Rust 1.97.1 MSVC, initializes clean portable configuration, restores locked Cargo dependencies, and runs native tests and the desktop release build offline.
+- **Linux web build and browser tests:** on Ubuntu 24.04, installs locked npm dependencies, checks TypeScript, builds the desktop web bundle, installs Playwright Chromium with its system libraries, and runs the same browser suites.
+- **Linux native tests and build:** on Ubuntu 24.04, installs WebKitGTK 4.1 and GTK development packages, selects Rust 1.97.1, and runs native tests and the desktop release build.
 
-Both jobs use the project's existing scripts. Downloads and generated files remain under the checkout. Caches contain npm downloads, Cargo registry data, and compiled artifacts. Action dependencies are pinned to verified commit hashes. The token has read-only repository-content access, and checkout credentials are not persisted.
+Both browser jobs use the same tests; `ORVYN_BROWSER_CHANNEL` selects Microsoft Edge on Windows and bundled Chromium on Linux. Both native jobs use the project's existing scripts. Downloads and generated files remain under the checkout. Caches contain npm downloads, Cargo registry data, and compiled artifacts. Action dependencies are pinned to verified commit hashes. The token has read-only repository-content access, and checkout credentials are not persisted.
 
 CI uses mocked browser responses and isolated native test fixtures. The two native tests requiring a live Qwen service or Hugging Face access remain explicitly ignored. No model weights, personal conversations, API keys, or training candidates are required. CI does not build installers, publish releases, or deploy the app.
 
-After these files are committed and pushed, open the repository's Actions tab to inspect the first run. Hosted-runner execution cannot be confirmed by local tests alone. For branch protection, use the check names `Web build and browser tests` and `Windows native tests and build` after they first appear.
+After these files are committed and pushed, open the repository's Actions tab to inspect the first run. Hosted-runner execution cannot be confirmed by local tests alone. For branch protection, use the check names `Windows web build and browser tests`, `Windows native tests and build`, `Linux web build and browser tests`, and `Linux native tests and build` after they first appear.
 
 ## Issues
 
@@ -21,4 +23,4 @@ The [improvement backlog](ISSUE-BACKLOG.md) contains ready-to-file issue drafts.
 
 Suggested triage: confirm reproducibility, identify the affected version, and prioritize data preservation and broken core flows before enhancements. Add labels through GitHub as needed; the forms do not depend on pre-existing labels.
 
-References: [GitHub issue-form syntax](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms), [Windows runner software](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md).
+References: [GitHub issue-form syntax](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms), [Windows runner software](https://github.com/actions/runner-images/blob/main/images/windows/Windows2022-Readme.md), [Ubuntu runner software](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md).

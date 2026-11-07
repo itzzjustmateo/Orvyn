@@ -13,7 +13,8 @@ Linux uses the system Rust toolchain and WebKitGTK. Install Node.js 22, Rust, `p
 ```bash
 sudo apt install build-essential pkg-config curl libwebkit2gtk-4.1-dev \
   libjavascriptcoregtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev nodejs npm
+  librsvg2-dev libxdo-dev libssl-dev libxkbcommon-dev libwayland-dev \
+  nodejs npm
 ```
 
 From the repository root, either run the shell scripts or use the `justfile`:

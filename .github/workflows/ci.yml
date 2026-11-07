@@ -13,15 +13,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-defaults:
-  run:
-    shell: pwsh
-
 jobs:
-  web:
-    name: Web build and browser tests
+  windows-web:
+    name: Windows web build and browser tests
     runs-on: windows-2022
     timeout-minutes: 25
+    env:
+      ORVYN_BROWSER_CHANNEL: msedge
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -62,10 +63,13 @@ jobs:
           node tests/opex-work-ui.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Opex browser tests failed' }
 
-  native:
+  windows-native:
     name: Windows native tests and build
     runs-on: windows-2022
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -93,3 +97,96 @@ jobs:
           cargo test --manifest-path apps/manager/Cargo.toml --release --locked --offline --jobs 4 -- --test-threads=2
       - name: Build desktop executable offline
         run: ./scripts/build-desktop.ps1
+
+  linux-web:
+    name: Linux web build and browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      ORVYN_BROWSER_CHANNEL: bundled
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Initialize portable configuration
+        run: ./scripts/init-config.sh
+      - name: Restore npm download cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: tools/cache/npm
+          key: npm-${{ runner.os }}-node22-${{ hashFiles('apps/web-ui/package-lock.json') }}
+      - name: Install locked web dependencies
+        run: |
+          . ./scripts/usb-environment.sh
+          cd apps/web-ui
+          npm ci
+      - name: Check TypeScript
+        run: node apps/web-ui/node_modules/typescript/bin/tsc --project apps/web-ui/tsconfig.json --noEmit --incremental false
+      - name: Build desktop web bundle
+        run: ./scripts/build-ui.sh
+      - name: Install Playwright Chromium
+        run: |
+          cd apps/web-ui
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Test chat streaming
+        run: node tests/chat-client.mjs
+      - name: Test workspace in Chromium
+        run: |
+          . ./scripts/usb-environment.sh
+          node tests/workspace-ui.mjs
+      - name: Test Opex Work in Chromium
+        run: |
+          . ./scripts/usb-environment.sh
+          node tests/opex-work-ui.mjs
+
+  linux-native:
+    name: Linux native tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install WebKitGTK and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            libxkbcommon-dev \
+            libwayland-dev
+      - name: Select verified Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustup default 1.97.1
+      - name: Initialize portable configuration
+        run: ./scripts/init-config.sh
+      - name: Restore Cargo dependencies and compiled artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            tools/cache/cargo/registry
+            apps/manager/build-usb
+          key: cargo-${{ runner.os }}-gnu-rust1.97.1-${{ hashFiles('apps/manager/Cargo.lock', 'apps/manager/build.rs') }}
+      - name: Run native tests
+        run: |
+          . ./scripts/usb-environment.sh
+          cargo test --manifest-path apps/manager/Cargo.toml --release --locked --target-dir "$CARGO_TARGET_DIR" -- --test-threads=2
+      - name: Build desktop executable
+        run: ./scripts/build-desktop.sh

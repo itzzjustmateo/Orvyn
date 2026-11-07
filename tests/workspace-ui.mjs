@@ -18,7 +18,7 @@ const server=createServer(async(req,res)=>{
   try{res.setHeader('Content-Type',name.endsWith('.png')?'image/png':name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':'text/javascript');res.end(await readFile(resolve(root,'apps/web-ui/dist',name)));}catch{res.writeHead(500).end();}
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=await chromium.launch(process.env.ORVYN_BROWSER_CHANNEL==='bundled'?{headless:true}:{channel:process.env.ORVYN_BROWSER_CHANNEL||'msedge',headless:true});
 let projectFixtureRoot;
 try{
   const page=await browser.newPage({viewport:{width:1400,height:1000}});

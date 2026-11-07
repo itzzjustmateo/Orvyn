@@ -91,7 +91,8 @@ Install Git, Node.js 22, Rust, `pkg-config`, and the WebKitGTK development packa
 ```bash
 sudo apt install build-essential pkg-config curl libwebkit2gtk-4.1-dev \
   libjavascriptcoregtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-  librsvg2-dev nodejs npm
+  librsvg2-dev libxdo-dev libssl-dev libxkbcommon-dev libwayland-dev \
+  nodejs npm
 ```
 
 Then use the Linux scripts directly or the bundled [just](https://github.com/casey/just) recipes:

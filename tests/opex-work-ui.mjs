@@ -7,7 +7,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const check=expect.configure({timeout:30000});
 const server=createServer(async(req,res)=>{const name=req.url==='/'?'index.html':req.url.slice(1);if(!/^(index\.html|app\.(js|css)|orvyn-logo\.png|chunks\/[\w.-]+\.js)$/.test(name)){res.writeHead(404).end();return;}try{res.setHeader('Content-Type',name.endsWith('.css')?'text/css':name.endsWith('.html')?'text/html':name.endsWith('.png')?'image/png':'text/javascript');res.end(await readFile(resolve(root,'apps/web-ui/dist',name)));}catch{res.writeHead(500).end();}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=await chromium.launch(process.env.ORVYN_BROWSER_CHANNEL==='bundled'?{headless:true}:{channel:process.env.ORVYN_BROWSER_CHANNEL||'msedge',headless:true});
 try{
   const page=await browser.newPage({viewport:{width:1450,height:1000}}),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
   let saved={chats:[{id:'old-chat',title:'Bestaand gesprek',model:'coder',createdAt:Date.now(),messages:[{id:'m1',role:'assistant',content:'Je bestaande gesprek blijft bewaard.'}]}],activeChatId:'old-chat',activeModel:'coder',expandedFolders:['today'],revision:'0'},file='before',writes=0,starts=0,stopCalls=0,modelStep=0,jobStopped=false,slowJob=false;
